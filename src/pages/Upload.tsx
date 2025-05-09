@@ -1,18 +1,28 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import FileUploader from '@/components/documents/FileUploader';
+import DataExtractionView from '@/components/documents/DataExtractionView';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Upload = () => {
+  const [showExtraction, setShowExtraction] = useState(false);
+
+  // Callback for when files are processed successfully
+  const handleFilesProcessed = () => {
+    // In a real app, this would be triggered by actual file processing
+    // For the demo, we'll just show the extraction section after "processing"
+    setShowExtraction(true);
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Upload Documents</h1>
           <p className="text-muted-foreground mt-1">
-            Upload documents for AI-powered processing and data extraction
+            Upload documents for AI-powered processing, data extraction, and summarization
           </p>
         </div>
 
@@ -33,9 +43,11 @@ const Upload = () => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <FileUploader />
+                    <FileUploader onFilesProcessed={handleFilesProcessed} />
                   </CardContent>
                 </Card>
+
+                {showExtraction && <DataExtractionView />}
               </div>
               
               <div className="lg:col-span-1">

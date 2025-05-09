@@ -7,7 +7,11 @@ import { Upload, X, FileType, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-const FileUploader = () => {
+interface FileUploaderProps {
+  onFilesProcessed?: () => void;
+}
+
+const FileUploader = ({ onFilesProcessed }: FileUploaderProps) => {
   const [files, setFiles] = useState<Array<File & { preview?: string }>>([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -64,6 +68,11 @@ const FileUploader = () => {
             setUploading(false);
             toast.success('Files processed successfully!');
             setFiles([]);
+            
+            // Call the callback function if provided
+            if (onFilesProcessed) {
+              onFilesProcessed();
+            }
           }, 500);
           return 100;
         }
