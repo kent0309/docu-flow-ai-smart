@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import FileUploader from '@/components/documents/FileUploader';
 import DataExtractionView from '@/components/documents/DataExtractionView';
+import ModelTraining from '@/components/ml/ModelTraining';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -101,6 +102,10 @@ const Upload = () => {
                     </div>
                   </CardContent>
                 </Card>
+                
+                <div className="mt-6">
+                  <ModelTraining />
+                </div>
               </div>
             </div>
           </TabsContent>

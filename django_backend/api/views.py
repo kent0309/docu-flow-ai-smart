@@ -88,3 +88,56 @@ class ExtractDataView(APIView):
             processed_doc.status = 'failed'
             processed_doc.save()
             return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class TrainModelView(APIView):
+    """API endpoint to trigger ML model training"""
+    
+    def post(self, request):
+        try:
+            # Start training process
+            success = document_processor.train_ml_model()
+            
+            if success:
+                return Response({
+                    'status': 'success',
+                    'message': 'Model training completed successfully'
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'status': 'warning',
+                    'message': 'Training skipped. Not enough data or model not improved'
+                }, status=status.HTTP_200_OK)
+                
+        except Exception as e:
+            return Response({
+                'status': 'error',
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class ModelStatsView(APIView):
+    """API endpoint to get ML model statistics"""
+    
+    def get(self, request):
+        try:
+            # In a real implementation, this would fetch actual metrics from the model
+            # For now, we'll return mock statistics
+            return Response({
+                'status': 'active',
+                'documentTypes': ['Invoice', 'Financial Report', 'Contract', 'Receipt', 'General Document'],
+                'totalDocumentsProcessed': 157,
+                'accuracy': 92.5,
+                'lastTrainingDate': '2025-05-01T14:32:45Z',
+                'confidenceByDocType': {
+                    'Invoice': 96.3,
+                    'Financial Report': 94.1,
+                    'Contract': 89.7,
+                    'Receipt': 91.5,
+                    'General Document': 83.2
+                }
+            }, status=status.HTTP_200_OK)
+                
+        except Exception as e:
+            return Response({
+                'status': 'error',
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -142,3 +142,13 @@ CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:8080,
 
 # File upload settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB limit for uploads
+
+# Firebase configuration
+FIREBASE_CREDENTIALS_PATH = os.getenv('FIREBASE_CREDENTIALS_PATH')
+FIREBASE_CREDENTIALS_JSON = os.getenv('FIREBASE_CREDENTIALS_JSON')
+FIREBASE_STORAGE_BUCKET = os.getenv('FIREBASE_STORAGE_BUCKET', 'document-processor-app.appspot.com')
+FIREBASE_PROJECT_ID = os.getenv('FIREBASE_PROJECT_ID', 'document-processor-app')
+
+# ML model directories
+MODELS_DIR = os.path.join(BASE_DIR, 'models')
+os.makedirs(MODELS_DIR, exist_ok=True)

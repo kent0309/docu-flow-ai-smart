@@ -9,4 +9,6 @@ urlpatterns = [
     path('documents/<int:pk>/extract/', views.ExtractDataView.as_view(), name='document-extract'),
     path('processed-documents/', views.ProcessedDocumentListView.as_view(), name='processed-document-list'),
     path('processed-documents/<int:pk>/', views.ProcessedDocumentDetailView.as_view(), name='processed-document-detail'),
+    path('ml/train/', views.TrainModelView.as_view(), name='ml-train'),
+    path('ml/stats/', views.ModelStatsView.as_view(), name='ml-stats'),
 ]

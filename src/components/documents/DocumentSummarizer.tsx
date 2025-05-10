@@ -27,11 +27,12 @@ const DocumentSummarizer = ({ documentId, documentText }: DocumentSummarizerProp
     
     try {
       // In a real implementation, this would call our Django backend
-      // Replace this URL with your actual Django backend URL
-      const apiUrl = 'http://localhost:8000/api/documents/1/summarize/';
+      const apiUrl = documentId ? 
+        `http://localhost:8000/api/documents/${documentId}/summarize/` : 
+        null;
       
       // For prototype, we'll still use the mock if no backend is available
-      if (process.env.NODE_ENV === 'production' || !documentId) {
+      if (!apiUrl || process.env.NODE_ENV === 'development') {
         // Use mock response for demo or when no document ID is available
         await new Promise(resolve => setTimeout(resolve, 2000));
         
@@ -48,6 +49,7 @@ const DocumentSummarizer = ({ documentId, documentText }: DocumentSummarizerProp
           `No document content available. Please upload a document first.`;
         
         setSummary(mockSummary);
+        toast.success('Document successfully summarized (using mock data)');
       } else {
         // Call backend API if document ID is available
         const response = await fetch(apiUrl, {
@@ -63,9 +65,8 @@ const DocumentSummarizer = ({ documentId, documentText }: DocumentSummarizerProp
         
         const data = await response.json();
         setSummary(data.summary);
+        toast.success('Document successfully summarized');
       }
-      
-      toast.success('Document successfully summarized');
     } catch (err) {
       console.error('Error summarizing document:', err);
       setError('Failed to summarize document. Please try again later.');

@@ -6,6 +6,8 @@ from PIL import Image
 import time
 import logging
 from transformers import pipeline
+from .ml_document_classifier import document_classifier
+from .firebase_integration import firebase_manager
 
 logger = logging.getLogger(__name__)
 
@@ -63,20 +65,48 @@ def extract_data(document):
         # This is a placeholder for demonstration
         doc_text = f"Text extraction not implemented for {document.file_type} files"
     
-    # Mock document type detection (in a real system, this would use ML)
-    if "invoice" in document.title.lower() or "inv-" in doc_text:
-        doc_type = "Invoice"
+    # Use ML model to classify document type
+    classification = document_classifier.predict_document_type(doc_text)
+    doc_type = classification["documentType"]
+    
+    # Extract fields based on document type
+    if doc_type == "Invoice":
         fields = detect_invoice_fields(doc_text)
-    elif "report" in document.title.lower():
-        doc_type = "Financial Report"
+    elif doc_type == "Financial Report":
         fields = detect_report_fields(doc_text)
     else:
-        doc_type = "General Document"
         fields = []
+    
+    # Store document in Firebase for training
+    if firebase_manager.is_initialized():
+        # Upload document to Firebase Storage
+        firebase_path = f"documents/{document.id}/{os.path.basename(file_path)}"
+        firebase_url = firebase_manager.upload_document(file_path, firebase_path)
+        
+        # Store metadata in Firestore
+        metadata = {
+            'id': document.id,
+            'title': document.title,
+            'file_type': document.file_type,
+            'uploaded_at': document.uploaded_at.isoformat(),
+            'firebase_url': firebase_url,
+            'document_type': doc_type,
+            'confidence': classification.get("confidence", 0)
+        }
+        firebase_manager.store_document_metadata(document.id, metadata)
+        
+        # Store processing result for model training
+        result_data = {
+            'text': doc_text,
+            'fields': fields,
+            'documentType': doc_type,
+        }
+        firebase_manager.store_processing_result(document.id, result_data, doc_type)
     
     # Return structured data
     return {
         "documentType": doc_type,
+        "confidence": classification.get("confidence", 0),
         "fields": fields,
         "text": doc_text[:1000]  # First 1000 chars for preview
     }
@@ -225,3 +255,7 @@ def summarize_document(document):
     except Exception as e:
         logger.error(f"Error summarizing document: {e}")
         return "Error generating summary. The document may be too complex or in an unsupported format."
+
+def train_ml_model():
+    """Train or update the machine learning model"""
+    return document_classifier.update_model()
