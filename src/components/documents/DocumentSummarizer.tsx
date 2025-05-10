@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertCircle, FileText, Copy } from 'lucide-react';
 import { toast } from 'sonner';
+import { DocumentService } from '@/services/document.service';
 
 interface DocumentSummarizerProps {
   documentId?: string;
@@ -26,46 +27,26 @@ const DocumentSummarizer = ({ documentId, documentText }: DocumentSummarizerProp
     setError(null);
     
     try {
-      // In a real implementation, this would call our Django backend
-      const apiUrl = documentId ? 
-        `http://localhost:8000/api/documents/${documentId}/summarize/` : 
-        null;
-      
-      // For prototype, we'll still use the mock if no backend is available
-      if (!apiUrl || process.env.NODE_ENV === 'development') {
-        // Use mock response for demo or when no document ID is available
+      // Use the document service to summarize
+      if (documentId) {
+        const result = await DocumentService.summarizeDocument(documentId);
+        setSummary(result.summary);
+        toast.success('Document successfully summarized');
+      } else if (documentText) {
+        // If we only have text but no document ID, use a mock summary
         await new Promise(resolve => setTimeout(resolve, 2000));
         
-        const mockSummary = documentText ? 
-          `Executive Summary:\n\n` +
+        const mockSummary = `Executive Summary:\n\n` +
           `This document discusses key financial metrics for Q3 2023, highlighting a 15% increase in revenue compared to Q2. ` +
           `Major points include:\n\n` +
           `• Revenue growth primarily driven by expansion in Asian markets\n` +
           `• Operating costs reduced by 8% due to automation initiatives\n` +
           `• New product line exceeded sales targets by 22%\n` +
           `• Customer retention improved to 94% (up from 89%)\n\n` +
-          `The document recommends continued investment in automation and expansion of the product line to additional markets in Q4.`
-          : 
-          `No document content available. Please upload a document first.`;
+          `The document recommends continued investment in automation and expansion of the product line to additional markets in Q4.`;
         
         setSummary(mockSummary);
         toast.success('Document successfully summarized (using mock data)');
-      } else {
-        // Call backend API if document ID is available
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        
-        if (!response.ok) {
-          throw new Error(`API request failed with status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        setSummary(data.summary);
-        toast.success('Document successfully summarized');
       }
     } catch (err) {
       console.error('Error summarizing document:', err);

@@ -1,73 +1,170 @@
-# Welcome to your Lovable project
 
-## Project info
+# Document Processor - AI-Powered Document Processing System
 
-**URL**: https://lovable.dev/projects/ab78d94e-7131-4c6f-b224-6978f4e83487
+A full-stack application for AI-powered document processing, data extraction, and summarization using React, Django, and machine learning.
 
-## How can I edit this code?
+## Project Overview
 
-There are several ways of editing your application.
+This application allows users to:
+- Upload documents (PDF, DOCX, images)
+- Extract structured data from documents using AI
+- Generate document summaries
+- Train ML models to improve document classification
+- View processed documents and analytics
 
-**Use Lovable**
+## Table of Contents
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/ab78d94e-7131-4c6f-b224-6978f4e83487) and start prompting.
+1. [System Requirements](#system-requirements)
+2. [Setup Instructions](#setup-instructions)
+   - [Frontend Setup](#frontend-setup)
+   - [Backend Setup](#backend-setup)
+   - [Firebase Setup](#firebase-setup)
+3. [Running the Application](#running-the-application)
+4. [Project Structure](#project-structure)
+5. [Technologies Used](#technologies-used)
 
-Changes made via Lovable will be committed automatically to this repo.
+## System Requirements
 
-**Use your preferred IDE**
+- Node.js (v18 or higher)
+- Python (v3.8 or higher)
+- pip (Python package manager)
+- Git
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Setup Instructions
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Frontend Setup
 
-Follow these steps:
+1. Clone the repository:
+   ```
+   git clone <repository-url>
+   cd <repository-folder>
+   ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+2. Install frontend dependencies:
+   ```
+   npm install
+   ```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+3. Create a `.env` file in the project root with:
+   ```
+   VITE_API_URL=http://localhost:8000/api
+   ```
 
-# Step 3: Install the necessary dependencies.
-npm i
+### Backend Setup
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+1. Navigate to the Django backend directory:
+   ```
+   cd django_backend
+   ```
+
+2. Create a virtual environment:
+   ```
+   python -m venv venv
+   ```
+
+3. Activate the virtual environment:
+   - Windows: `venv\Scripts\activate`
+   - macOS/Linux: `source venv/bin/activate`
+
+4. Install dependencies:
+   ```
+   pip install -r requirements.txt
+   ```
+
+5. Create a `.env` file with the following:
+   ```
+   SECRET_KEY=your-secret-key
+   DEBUG=True
+   ALLOWED_HOSTS=localhost,127.0.0.1
+   CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+   ```
+
+6. Run migrations:
+   ```
+   python manage.py migrate
+   ```
+
+### Firebase Setup
+
+1. Create a Firebase project at [Firebase Console](https://console.firebase.google.com/)
+
+2. Enable Storage and Firestore in your Firebase project
+
+3. Generate a Firebase service account key:
+   - Go to Project Settings > Service Accounts
+   - Click "Generate New Private Key"
+   - Save the JSON file
+
+4. Add Firebase credentials to Django backend:
+   - Option 1: Save the JSON file in a secure location and add to `.env`:
+     ```
+     FIREBASE_CREDENTIALS_PATH=/path/to/your/serviceAccountKey.json
+     ```
+   - Option 2: Add the JSON content as a string in `.env`:
+     ```
+     FIREBASE_CREDENTIALS_JSON={"type":"service_account","project_id":"your-project",...}
+     ```
+
+5. Update frontend Firebase config in `src/services/firebase.ts` with your Firebase project details
+
+## Running the Application
+
+### Start the Backend
+
+1. From the `django_backend` directory with the virtual environment activated:
+   ```
+   python manage.py runserver
+   ```
+   The Django API will be available at http://localhost:8000/api/
+
+### Start the Frontend
+
+1. From the project root in a new terminal:
+   ```
+   npm run dev
+   ```
+   The React app will be available at http://localhost:5173/
+
+## Project Structure
+
+```
+.
+├── src/                    # Frontend React code
+│   ├── components/         # React components
+│   ├── config/             # Configuration files
+│   ├── pages/              # Page components
+│   ├── services/           # API service functions
+│   └── ...
+└── django_backend/         # Backend Django code
+    ├── api/                # Django REST API app
+    │   ├── models.py       # Database models
+    │   ├── services/       # Business logic services
+    │   ├── views.py        # API endpoints
+    │   └── ...
+    └── document_processor/ # Django project settings
 ```
 
-**Edit a file directly in GitHub**
+## Technologies Used
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
+### Frontend
 - React
-- shadcn-ui
+- TypeScript
 - Tailwind CSS
+- Shadcn UI
+- Tanstack React Query
 
-## How can I deploy this project?
+### Backend
+- Django
+- Django REST Framework
+- Firebase (Storage & Firestore)
+- Machine Learning libraries
+  - scikit-learn
+  - Transformers
+  - PyTesseract (OCR)
+  - PDF2Image
 
-Simply open [Lovable](https://lovable.dev/projects/ab78d94e-7131-4c6f-b224-6978f4e83487) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+### AI & ML Features
+- Document classification
+- Text extraction (OCR)
+- Document summarization
+- Field extraction

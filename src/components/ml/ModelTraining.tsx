@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { Brain, Activity, BarChart3 } from 'lucide-react';
+import { MLService } from '@/services/ml.service';
 
 const ModelTraining = () => {
   const [training, setTraining] = useState(false);
@@ -26,30 +27,17 @@ const ModelTraining = () => {
     }, 800);
     
     try {
-      // In a real implementation, call the Django backend
-      const response = await fetch('http://localhost:8000/api/ml/train/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }).catch(() => {
-        // If the server is unavailable, simulate a response for the demo
-        return new Response(JSON.stringify({
-          status: 'success',
-          message: 'Model training completed successfully (simulated)'
-        }), { status: 200 });
-      });
-      
-      const data = await response.json();
+      // Call the ML service to train the model
+      const result = await MLService.trainModel();
       
       // Complete the progress bar and show success
       clearInterval(progressInterval);
       setProgress(100);
       
-      if (data.status === 'success') {
-        toast.success(data.message || 'Model training completed successfully');
+      if (result.status === 'success') {
+        toast.success(result.message || 'Model training completed successfully');
       } else {
-        toast.warning(data.message || 'Training completed with warnings');
+        toast.warning(result.message || 'Training completed with warnings');
       }
       
     } catch (error) {
