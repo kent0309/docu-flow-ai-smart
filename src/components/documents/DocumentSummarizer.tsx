@@ -26,24 +26,45 @@ const DocumentSummarizer = ({ documentId, documentText }: DocumentSummarizerProp
     setError(null);
     
     try {
-      // In a real implementation, this would call a backend API
-      // For prototype purposes, we're using a timeout to simulate processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // In a real implementation, this would call our Django backend
+      // Replace this URL with your actual Django backend URL
+      const apiUrl = 'http://localhost:8000/api/documents/1/summarize/';
       
-      // Mock response - this would come from the backend in a real implementation
-      const mockSummary = documentText ? 
-        `Executive Summary:\n\n` +
-        `This document discusses key financial metrics for Q3 2023, highlighting a 15% increase in revenue compared to Q2. ` +
-        `Major points include:\n\n` +
-        `• Revenue growth primarily driven by expansion in Asian markets\n` +
-        `• Operating costs reduced by 8% due to automation initiatives\n` +
-        `• New product line exceeded sales targets by 22%\n` +
-        `• Customer retention improved to 94% (up from 89%)\n\n` +
-        `The document recommends continued investment in automation and expansion of the product line to additional markets in Q4.`
-        : 
-        `No document content available. Please upload a document first.`;
+      // For prototype, we'll still use the mock if no backend is available
+      if (process.env.NODE_ENV === 'production' || !documentId) {
+        // Use mock response for demo or when no document ID is available
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        const mockSummary = documentText ? 
+          `Executive Summary:\n\n` +
+          `This document discusses key financial metrics for Q3 2023, highlighting a 15% increase in revenue compared to Q2. ` +
+          `Major points include:\n\n` +
+          `• Revenue growth primarily driven by expansion in Asian markets\n` +
+          `• Operating costs reduced by 8% due to automation initiatives\n` +
+          `• New product line exceeded sales targets by 22%\n` +
+          `• Customer retention improved to 94% (up from 89%)\n\n` +
+          `The document recommends continued investment in automation and expansion of the product line to additional markets in Q4.`
+          : 
+          `No document content available. Please upload a document first.`;
+        
+        setSummary(mockSummary);
+      } else {
+        // Call backend API if document ID is available
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          throw new Error(`API request failed with status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        setSummary(data.summary);
+      }
       
-      setSummary(mockSummary);
       toast.success('Document successfully summarized');
     } catch (err) {
       console.error('Error summarizing document:', err);
