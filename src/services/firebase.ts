@@ -1,4 +1,7 @@
 
+// NOTE: This file is kept for reference but is no longer actively used in the application.
+// The system now uses a local Django-based ML model instead of Firebase for storage and ML.
+
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getStorage } from "firebase/storage";
@@ -32,6 +35,6 @@ export const isFirebaseConfigured = () => {
 // Warning message for development
 if (process.env.NODE_ENV !== 'production') {
   console.warn(
-    'Using development Firebase configuration. For production, replace with your actual Firebase project configuration.'
+    'Firebase configuration is no longer actively used. The application now uses a Django-based ML model.'
   );
 }

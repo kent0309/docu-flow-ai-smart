@@ -18,7 +18,7 @@ This application allows users to:
 2. [Setup Instructions](#setup-instructions)
    - [Frontend Setup](#frontend-setup)
    - [Backend Setup](#backend-setup)
-   - [Firebase Setup](#firebase-setup)
+   - [Model Training](#model-training)
 3. [Running the Application](#running-the-application)
 4. [Project Structure](#project-structure)
 5. [Technologies Used](#technologies-used)
@@ -29,6 +29,7 @@ This application allows users to:
 - Python (v3.8 or higher)
 - pip (Python package manager)
 - Git
+- PostgreSQL (recommended for production)
 
 ## Setup Instructions
 
@@ -77,6 +78,8 @@ This application allows users to:
    DEBUG=True
    ALLOWED_HOSTS=localhost,127.0.0.1
    CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+   MEDIA_ROOT=/path/to/media/folder
+   UPLOAD_DIR=documents
    ```
 
 6. Run migrations:
@@ -84,28 +87,20 @@ This application allows users to:
    python manage.py migrate
    ```
 
-### Firebase Setup
+### Model Training
 
-1. Create a Firebase project at [Firebase Console](https://console.firebase.google.com/)
+1. Prepare your dataset:
+   - Collect document images/PDFs for training
+   - Organize them by document type (invoice, contract, etc.)
 
-2. Enable Storage and Firestore in your Firebase project
-
-3. Generate a Firebase service account key:
-   - Go to Project Settings > Service Accounts
-   - Click "Generate New Private Key"
-   - Save the JSON file
-
-4. Add Firebase credentials to Django backend:
-   - Option 1: Save the JSON file in a secure location and add to `.env`:
+2. Train the model:
+   - Either use the `/ml/train/` endpoint after uploading documents
+   - Or run the training script directly:
      ```
-     FIREBASE_CREDENTIALS_PATH=/path/to/your/serviceAccountKey.json
-     ```
-   - Option 2: Add the JSON content as a string in `.env`:
-     ```
-     FIREBASE_CREDENTIALS_JSON={"type":"service_account","project_id":"your-project",...}
+     python manage.py train_model
      ```
 
-5. Update frontend Firebase config in `src/services/firebase.ts` with your Firebase project details
+3. The trained model will be saved locally in the Django application folder and loaded at server startup.
 
 ## Running the Application
 
@@ -141,6 +136,7 @@ This application allows users to:
     │   ├── services/       # Business logic services
     │   ├── views.py        # API endpoints
     │   └── ...
+    ├── media/              # Uploaded files and trained models
     └── document_processor/ # Django project settings
 ```
 
@@ -156,7 +152,7 @@ This application allows users to:
 ### Backend
 - Django
 - Django REST Framework
-- Firebase (Storage & Firestore)
+- PostgreSQL (recommended for production)
 - Machine Learning libraries
   - scikit-learn
   - Transformers
