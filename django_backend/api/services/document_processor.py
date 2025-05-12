@@ -7,7 +7,6 @@ import time
 import logging
 from transformers import pipeline
 from .ml_document_classifier import document_classifier
-from .firebase_integration import firebase_manager
 
 logger = logging.getLogger(__name__)
 
@@ -77,31 +76,17 @@ def extract_data(document):
     else:
         fields = []
     
-    # Store document in Firebase for training
-    if firebase_manager.is_initialized():
-        # Upload document to Firebase Storage
-        firebase_path = f"documents/{document.id}/{os.path.basename(file_path)}"
-        firebase_url = firebase_manager.upload_document(file_path, firebase_path)
-        
-        # Store metadata in Firestore
-        metadata = {
-            'id': document.id,
-            'title': document.title,
-            'file_type': document.file_type,
-            'uploaded_at': document.uploaded_at.isoformat(),
-            'firebase_url': firebase_url,
-            'document_type': doc_type,
-            'confidence': classification.get("confidence", 0)
-        }
-        firebase_manager.store_document_metadata(document.id, metadata)
-        
-        # Store processing result for model training
-        result_data = {
-            'text': doc_text,
-            'fields': fields,
-            'documentType': doc_type,
-        }
-        firebase_manager.store_processing_result(document.id, result_data, doc_type)
+    # Store document text for model training
+    # This would typically go to a database in production
+    training_data_path = os.path.join(os.path.dirname(file_path), '..', 'training_data')
+    os.makedirs(training_data_path, exist_ok=True)
+    
+    try:
+        with open(os.path.join(training_data_path, f"{document.id}.txt"), "w") as f:
+            f.write(f"DOCUMENT_TYPE: {doc_type}\n\n")
+            f.write(doc_text)
+    except Exception as e:
+        logger.error(f"Error saving training data: {e}")
     
     # Return structured data
     return {

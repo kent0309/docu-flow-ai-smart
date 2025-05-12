@@ -26,10 +26,31 @@ export const checkBackendAvailability = async (): Promise<boolean> => {
       headers: {
         'Content-Type': 'application/json',
       },
+      timeout: 3000, // 3 second timeout
     });
     return response.ok;
   } catch (error) {
     console.warn('Backend API is not available:', error);
     return false;
   }
+};
+
+// Helper function to get a simple token for development purposes
+// In a real application, this would be replaced with proper authentication
+export const getAuthToken = (): string | null => {
+  return localStorage.getItem('auth_token');
+};
+
+// Common headers for API requests
+export const getCommonHeaders = () => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  
+  const token = getAuthToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return headers;
 };

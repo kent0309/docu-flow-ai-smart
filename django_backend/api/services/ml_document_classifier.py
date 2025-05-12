@@ -10,7 +10,6 @@ from sklearn.metrics import accuracy_score
 import joblib
 import logging
 from django.conf import settings
-from .firebase_integration import firebase_manager
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +60,7 @@ class DocumentClassifier:
                 ('clf', RandomForestClassifier(n_estimators=100))
             ])
             
-            # Train on a very small sample dataset (this would normally come from Firebase)
+            # Train on a very small sample dataset
             sample_data = [
                 ("Invoice #1234 from Company ABC Total: $500.00", "Invoice"),
                 ("Quarterly Financial Report Q3 2023 Revenue: $1.2M", "Financial Report"),
@@ -119,17 +118,35 @@ class DocumentClassifier:
             return {"documentType": "General Document", "confidence": 60}
     
     def update_model(self, force_train=False):
-        """Retrain the model with new data from Firebase"""
-        if not firebase_manager.is_initialized():
-            logger.warning("Firebase not initialized. Can't update model.")
-            return False
-        
+        """Retrain the model with new data from file system"""
         try:
-            # Get training data from Firebase
-            training_data = firebase_manager.get_training_dataset(limit=1000)
+            # Get training data from filesystem
+            training_data_dir = os.path.join(settings.MEDIA_ROOT, 'training_data')
+            os.makedirs(training_data_dir, exist_ok=True)
+            
+            training_data = []
+            for filename in os.listdir(training_data_dir):
+                if filename.endswith('.txt'):
+                    try:
+                        with open(os.path.join(training_data_dir, filename), 'r') as f:
+                            content = f.read()
+                            
+                            # Extract document type from first line if available
+                            doc_type = "General Document"  # Default
+                            if content.startswith("DOCUMENT_TYPE:"):
+                                first_line = content.split('\n')[0]
+                                doc_type = first_line.replace("DOCUMENT_TYPE:", "").strip()
+                                content = '\n'.join(content.split('\n')[2:])  # Remove header
+                                
+                            training_data.append({
+                                'text': content,
+                                'documentType': doc_type
+                            })
+                    except Exception as e:
+                        logger.error(f"Error reading training file {filename}: {e}")
             
             if not training_data:
-                logger.info("No training data available in Firebase")
+                logger.info("No training data available")
                 return False
             
             # Extract text and document types
