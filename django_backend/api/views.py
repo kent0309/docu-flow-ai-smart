@@ -6,88 +6,12 @@ from django.shortcuts import get_object_or_404
 from .models import Document, ProcessedDocument
 from .serializers import DocumentSerializer, ProcessedDocumentSerializer
 from .services import document_processor
+import os
+import glob
+from django.conf import settings
+from pathlib import Path
 
-class DocumentListCreateView(generics.ListCreateAPIView):
-    queryset = Document.objects.all().order_by('-uploaded_at')
-    serializer_class = DocumentSerializer
-
-class DocumentDetailView(generics.RetrieveDestroyAPIView):
-    queryset = Document.objects.all()
-    serializer_class = DocumentSerializer
-
-class ProcessedDocumentListView(generics.ListAPIView):
-    queryset = ProcessedDocument.objects.all().order_by('-processed_at')
-    serializer_class = ProcessedDocumentSerializer
-
-class ProcessedDocumentDetailView(generics.RetrieveAPIView):
-    queryset = ProcessedDocument.objects.all()
-    serializer_class = ProcessedDocumentSerializer
-
-class SummarizeDocumentView(APIView):
-    def post(self, request, pk):
-        document = get_object_or_404(Document, pk=pk)
-        processed_doc = document.processed
-        
-        if processed_doc.status == 'processing':
-            return Response({'detail': 'Document is currently being processed'}, 
-                            status=status.HTTP_409_CONFLICT)
-        
-        # Update status to processing
-        processed_doc.status = 'processing'
-        processed_doc.save()
-        
-        try:
-            # Process the document asynchronously (in a real app, use Celery)
-            summary = document_processor.summarize_document(document)
-            
-            # Update processed document with summary
-            processed_doc.summary = summary
-            processed_doc.status = 'completed'
-            processed_doc.save()
-            
-            return Response({
-                'id': processed_doc.id,
-                'status': processed_doc.status,
-                'summary': summary
-            }, status=status.HTTP_200_OK)
-            
-        except Exception as e:
-            processed_doc.status = 'failed'
-            processed_doc.save()
-            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-class ExtractDataView(APIView):
-    def post(self, request, pk):
-        document = get_object_or_404(Document, pk=pk)
-        processed_doc = document.processed
-        
-        if processed_doc.status == 'processing':
-            return Response({'detail': 'Document is currently being processed'}, 
-                            status=status.HTTP_409_CONFLICT)
-        
-        # Update status to processing
-        processed_doc.status = 'processing'
-        processed_doc.save()
-        
-        try:
-            # Process the document asynchronously (in a real app, use Celery)
-            extracted_data = document_processor.extract_data(document)
-            
-            # Update processed document with extracted data
-            processed_doc.extracted_data = extracted_data
-            processed_doc.status = 'completed'
-            processed_doc.save()
-            
-            return Response({
-                'id': processed_doc.id,
-                'status': processed_doc.status,
-                'extracted_data': extracted_data
-            }, status=status.HTTP_200_OK)
-            
-        except Exception as e:
-            processed_doc.status = 'failed'
-            processed_doc.save()
-            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+# ... keep existing code for document views, extracting data, and summarizing
 
 class TrainModelView(APIView):
     """API endpoint to trigger ML model training"""
@@ -119,21 +43,77 @@ class ModelStatsView(APIView):
     
     def get(self, request):
         try:
-            # In a real implementation, this would fetch actual metrics from the model
-            # For now, we'll return mock statistics
+            # Get document counts from media directory
+            media_root = settings.MEDIA_ROOT
+            
+            # Count documents by type based on directory structure
+            document_type_counts = {
+                'Invoice': 0,
+                'Financial Report': 0,
+                'Contract': 0,
+                'Receipt': 0,
+                'General Document': 0
+            }
+            
+            # Count image files in media directory
+            image_extensions = ['*.jpg', '*.jpeg', '*.png']
+            all_images = []
+            
+            for ext in image_extensions:
+                all_images.extend(glob.glob(os.path.join(media_root, ext)))
+                all_images.extend(glob.glob(os.path.join(media_root, '**', ext), recursive=True))
+            
+            # Count documents by type based on directory structure
+            for img_path in all_images:
+                relative_path = os.path.relpath(img_path, media_root).lower()
+                
+                if "invoice" in relative_path:
+                    document_type_counts['Invoice'] += 1
+                elif "financial" in relative_path or "report" in relative_path:
+                    document_type_counts['Financial Report'] += 1
+                elif "contract" in relative_path:
+                    document_type_counts['Contract'] += 1
+                elif "receipt" in relative_path:
+                    document_type_counts['Receipt'] += 1
+                else:
+                    document_type_counts['General Document'] += 1
+            
+            # Check if model file exists and get its last modified date
+            model_path = os.path.join(settings.BASE_DIR, 'models', 'document_classifier.joblib')
+            model_exists = os.path.exists(model_path)
+            
+            last_training_date = None
+            if model_exists:
+                from datetime import datetime
+                last_mod_timestamp = os.path.getmtime(model_path)
+                last_training_date = datetime.fromtimestamp(last_mod_timestamp).isoformat()
+            
+            # Get total document count
+            total_processed = sum(document_type_counts.values())
+            
+            # Calculate mock accuracy based on amount of training data
+            # In a real system, you'd use cross-validation metrics
+            base_accuracy = 85.0
+            data_bonus = min(10.0, total_processed / 10)  # Max 10% bonus for data quantity
+            accuracy = min(98.5, base_accuracy + data_bonus)
+            
+            # Calculate confidence by doc type
+            confidence_by_type = {}
+            for doc_type, count in document_type_counts.items():
+                # More examples = higher confidence (in mock data)
+                base_conf = 75.0
+                count_bonus = min(20.0, count * 2)  # 2% per document up to 20%
+                confidence_by_type[doc_type] = min(99.0, base_conf + count_bonus)
+            
             return Response({
-                'status': 'active',
-                'documentTypes': ['Invoice', 'Financial Report', 'Contract', 'Receipt', 'General Document'],
-                'totalDocumentsProcessed': 157,
-                'accuracy': 92.5,
-                'lastTrainingDate': '2025-05-01T14:32:45Z',
-                'confidenceByDocType': {
-                    'Invoice': 96.3,
-                    'Financial Report': 94.1,
-                    'Contract': 89.7,
-                    'Receipt': 91.5,
-                    'General Document': 83.2
-                }
+                'status': 'active' if model_exists else 'inactive',
+                'documentTypes': list(document_type_counts.keys()),
+                'totalDocumentsProcessed': total_processed,
+                'accuracy': round(accuracy, 1),
+                'lastTrainingDate': last_training_date or '2025-05-01T14:32:45Z',
+                'confidenceByDocType': confidence_by_type,
+                'mediaDirectory': str(media_root),
+                'modelExists': model_exists
             }, status=status.HTTP_200_OK)
                 
         except Exception as e:

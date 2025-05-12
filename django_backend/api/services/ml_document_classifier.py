@@ -117,6 +117,63 @@ class DocumentClassifier:
         else:
             return {"documentType": "General Document", "confidence": 60}
     
+    def update_model_with_data(self, training_data):
+        """Update the model with provided training data"""
+        try:
+            if not training_data:
+                logger.info("No training data provided")
+                return False
+            
+            # Extract text and document types
+            X = [item.get('text', '') for item in training_data if 'text' in item]
+            y = [item.get('documentType', 'General Document') for item in training_data if 'documentType' in item]
+            
+            if len(X) < 5:  # Need minimum amount of data
+                logger.info(f"Not enough training samples ({len(X)}). Need at least 5.")
+                return False
+            
+            logger.info(f"Training model with {len(X)} samples")
+            
+            # Split data for training and evaluation
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+            
+            # Create a new pipeline
+            new_model = Pipeline([
+                ('tfidf', TfidfVectorizer(max_features=5000, ngram_range=(1, 2))),
+                ('clf', RandomForestClassifier(n_estimators=100))
+            ])
+            
+            # Train the new model
+            new_model.fit(X_train, y_train)
+            
+            # Evaluate on test set
+            y_pred = new_model.predict(X_test)
+            accuracy = accuracy_score(y_test, y_pred)
+            
+            logger.info(f"New model accuracy: {accuracy:.4f}")
+            
+            # If new model is better, replace the old one
+            current_accuracy = 0.7  # Default starting point
+            if self.model:
+                try:
+                    current_y_pred = self.model.predict(X_test)
+                    current_accuracy = accuracy_score(y_test, current_y_pred)
+                except:
+                    pass
+            
+            if accuracy > current_accuracy:
+                logger.info(f"Replacing model (Old: {current_accuracy:.4f}, New: {accuracy:.4f})")
+                self.model = new_model
+                joblib.dump(self.model, self.model_path)
+                return True
+            else:
+                logger.info(f"Keeping current model (Current: {current_accuracy:.4f}, New: {accuracy:.4f})")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error updating model with data: {e}")
+            return False
+    
     def update_model(self, force_train=False):
         """Retrain the model with new data from file system"""
         try:
@@ -149,54 +206,39 @@ class DocumentClassifier:
                 logger.info("No training data available")
                 return False
             
+            return self.update_model_with_data(training_data) if not force_train else self._force_train_model(training_data)
+                
+        except Exception as e:
+            logger.error(f"Error updating model: {e}")
+            return False
+    
+    def _force_train_model(self, training_data):
+        """Force training a new model regardless of performance comparison"""
+        try:
             # Extract text and document types
             X = [item.get('text', '') for item in training_data if 'text' in item]
             y = [item.get('documentType', 'General Document') for item in training_data if 'documentType' in item]
             
-            if len(X) < 10:  # Need minimum amount of data
-                logger.info(f"Not enough training samples ({len(X)}). Need at least 10.")
+            if len(X) < 5:
+                logger.info(f"Not enough training samples ({len(X)}). Need at least 5.")
                 return False
-            
-            logger.info(f"Retraining model with {len(X)} samples")
-            
-            # Split data for training and evaluation
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-            
-            # Create a new pipeline
+                
+            # Create and train new model
             new_model = Pipeline([
                 ('tfidf', TfidfVectorizer(max_features=5000, ngram_range=(1, 2))),
                 ('clf', RandomForestClassifier(n_estimators=100))
             ])
             
-            # Train the new model
-            new_model.fit(X_train, y_train)
+            new_model.fit(X, y)
             
-            # Evaluate on test set
-            y_pred = new_model.predict(X_test)
-            accuracy = accuracy_score(y_test, y_pred)
+            # Save the model
+            self.model = new_model
+            joblib.dump(self.model, self.model_path)
+            logger.info("Force trained and saved new model")
+            return True
             
-            logger.info(f"New model accuracy: {accuracy:.4f}")
-            
-            # If new model is better or force training is requested, replace the old one
-            current_accuracy = 0.7  # Default starting point
-            if self.model:
-                try:
-                    current_y_pred = self.model.predict(X_test)
-                    current_accuracy = accuracy_score(y_test, current_y_pred)
-                except:
-                    pass
-            
-            if force_train or accuracy > current_accuracy:
-                logger.info(f"Replacing model (Old: {current_accuracy:.4f}, New: {accuracy:.4f})")
-                self.model = new_model
-                joblib.dump(self.model, self.model_path)
-                return True
-            else:
-                logger.info(f"Keeping current model (Current: {current_accuracy:.4f}, New: {accuracy:.4f})")
-                return False
-                
         except Exception as e:
-            logger.error(f"Error updating model: {e}")
+            logger.error(f"Error force training model: {e}")
             return False
 
 # Create an instance of the classifier

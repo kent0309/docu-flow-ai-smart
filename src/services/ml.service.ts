@@ -1,5 +1,5 @@
 
-import { API_ENDPOINTS, checkBackendAvailability } from '@/config/api';
+import { API_ENDPOINTS, checkBackendAvailability, getCommonHeaders } from '@/config/api';
 
 export interface ModelStats {
   status: string;
@@ -8,6 +8,8 @@ export interface ModelStats {
   accuracy: number;
   lastTrainingDate: string;
   confidenceByDocType: Record<string, number>;
+  mediaDirectory?: string;
+  modelExists?: boolean;
 }
 
 export interface TrainingResult {
@@ -22,9 +24,7 @@ export const MLService = {
     if (isBackendAvailable) {
       const response = await fetch(API_ENDPOINTS.ML_TRAIN, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getCommonHeaders(),
       });
       
       if (!response.ok) {
@@ -46,7 +46,9 @@ export const MLService = {
     const isBackendAvailable = await checkBackendAvailability();
     
     if (isBackendAvailable) {
-      const response = await fetch(API_ENDPOINTS.ML_STATS);
+      const response = await fetch(API_ENDPOINTS.ML_STATS, {
+        headers: getCommonHeaders(),
+      });
       
       if (!response.ok) {
         throw new Error(`Failed to fetch model stats with status: ${response.status}`);

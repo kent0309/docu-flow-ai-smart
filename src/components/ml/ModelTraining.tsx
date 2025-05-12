@@ -1,15 +1,34 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Brain, Activity, BarChart3 } from 'lucide-react';
-import { MLService } from '@/services/ml.service';
+import { Brain, Activity, BarChart3, HardDrive } from 'lucide-react';
+import { MLService, ModelStats } from '@/services/ml.service';
 
 const ModelTraining = () => {
   const [training, setTraining] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [modelStats, setModelStats] = useState<ModelStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    loadModelStats();
+  }, []);
+  
+  const loadModelStats = async () => {
+    setLoading(true);
+    try {
+      const stats = await MLService.getModelStats();
+      setModelStats(stats);
+    } catch (error) {
+      console.error('Failed to load model stats:', error);
+      toast.error('Unable to load model statistics');
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const handleTrainModel = async () => {
     setTraining(true);
@@ -40,6 +59,9 @@ const ModelTraining = () => {
         toast.warning(result.message || 'Training completed with warnings');
       }
       
+      // Refresh stats after training
+      await loadModelStats();
+      
     } catch (error) {
       console.error('Error during model training:', error);
       toast.error('Failed to train model. Please try again.');
@@ -50,6 +72,24 @@ const ModelTraining = () => {
     }
   };
   
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Brain className="h-5 w-5" />
+            ML Model Training
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex justify-center py-6">
+            <Progress value={100} className="w-2/3 h-2 animate-pulse" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+  
   return (
     <Card>
       <CardHeader>
@@ -58,15 +98,24 @@ const ModelTraining = () => {
           ML Model Training
         </CardTitle>
         <CardDescription>
-          Train the document classification model using your dataset
+          Train the document classification model using images from your media directory
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            The ML model improves by learning from the documents you process. 
+            The ML model improves by learning from the images in your media directory. 
             Regular training ensures accurate document categorization and data extraction.
           </p>
+          
+          {modelStats?.mediaDirectory && (
+            <div className="bg-muted/50 p-3 rounded-lg flex items-center gap-2 text-sm">
+              <HardDrive className="h-4 w-4 text-blue-500" />
+              <span className="text-xs text-muted-foreground overflow-hidden text-ellipsis">
+                Media Directory: {modelStats.mediaDirectory}
+              </span>
+            </div>
+          )}
           
           <div className="bg-muted/50 p-4 rounded-lg space-y-4">
             <div className="flex justify-between items-center">
@@ -74,22 +123,30 @@ const ModelTraining = () => {
                 <Activity className="h-4 w-4 text-green-600" />
                 <span className="text-sm font-medium">Model Status</span>
               </div>
-              <span className="text-sm bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
-                Active
+              <span className={`text-sm px-2 py-0.5 rounded-full ${
+                modelStats?.modelExists 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-amber-100 text-amber-800'
+              }`}>
+                {modelStats?.modelExists ? 'Active' : 'Not Trained'}
               </span>
             </div>
             
             <div className="space-y-1">
               <div className="flex justify-between text-xs">
                 <span>Model Accuracy</span>
-                <span>92.5%</span>
+                <span>{modelStats?.accuracy || 0}%</span>
               </div>
-              <Progress value={92.5} className="h-2" />
+              <Progress value={modelStats?.accuracy || 0} className="h-2" />
             </div>
             
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Last trained: 10 days ago</span>
-              <span>157 documents processed</span>
+              <span>
+                {modelStats?.lastTrainingDate 
+                  ? `Last trained: ${new Date(modelStats?.lastTrainingDate).toLocaleDateString()}`
+                  : 'Not trained yet'}
+              </span>
+              <span>{modelStats?.totalDocumentsProcessed || 0} documents available</span>
             </div>
           </div>
           

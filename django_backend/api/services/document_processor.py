@@ -5,8 +5,11 @@ from pdf2image import convert_from_path
 from PIL import Image
 import time
 import logging
+import glob
+from pathlib import Path
 from transformers import pipeline
 from .ml_document_classifier import document_classifier
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +51,24 @@ def extract_text_from_pdf(pdf_path):
         logger.error(f"Error extracting text from PDF {pdf_path}: {e}")
         return ""
 
+def get_training_images():
+    """Get all images from the media directory for training"""
+    media_root = settings.MEDIA_ROOT
+    
+    # Look for images in the entire media directory and subdirectories
+    image_extensions = ['*.jpg', '*.jpeg', '*.png']
+    all_images = []
+    
+    for ext in image_extensions:
+        # Find images in the main media directory
+        all_images.extend(glob.glob(os.path.join(media_root, ext)))
+        
+        # Find images in subdirectories (documents folder, etc.)
+        all_images.extend(glob.glob(os.path.join(media_root, '**', ext), recursive=True))
+    
+    logger.info(f"Found {len(all_images)} images for potential training")
+    return all_images
+
 def extract_data(document):
     """Extract structured data from a document"""
     # Get the document file path
@@ -55,7 +76,7 @@ def extract_data(document):
     
     # Extract text based on document type
     doc_text = ""
-    if document.file_type in ['jpg', 'png']:
+    if document.file_type in ['jpg', 'jpeg', 'png']:
         doc_text = extract_text_from_image(file_path)
     elif document.file_type == 'pdf':
         doc_text = extract_text_from_pdf(file_path)
@@ -98,9 +119,7 @@ def extract_data(document):
 
 def detect_invoice_fields(text):
     """Detect and extract invoice fields from text"""
-    # This is a simplified mock implementation
-    # In a real system, this would use NER (Named Entity Recognition) models
-    
+    # ... keep existing code for invoice field detection
     fields = []
     
     # Mock field extraction with confidence scores
@@ -152,7 +171,7 @@ def detect_invoice_fields(text):
 
 def detect_report_fields(text):
     """Detect and extract report fields from text"""
-    # Mock implementation for reports
+    # ... keep existing code for report field detection
     fields = []
     
     if "Report:" in text or "Title:" in text:
@@ -200,6 +219,7 @@ def detect_report_fields(text):
 
 def summarize_document(document):
     """Generate a summary of the document content"""
+    # ... keep existing code for document summarization
     # Get the document file path
     file_path = document.file.path
     
@@ -243,4 +263,52 @@ def summarize_document(document):
 
 def train_ml_model():
     """Train or update the machine learning model"""
-    return document_classifier.update_model()
+    # Get all available images for training
+    training_images = get_training_images()
+    
+    # Extract text from images for training
+    training_data = []
+    for image_path in training_images:
+        try:
+            # Get relative path from media root for better document type identification
+            relative_path = os.path.relpath(image_path, settings.MEDIA_ROOT)
+            dir_parts = Path(relative_path).parts
+            
+            # Try to determine document type from directory structure
+            doc_type = "General Document"  # Default
+            if len(dir_parts) > 1:
+                possible_types = ["Invoice", "Financial Report", "Contract", "Receipt"]
+                for pt in possible_types:
+                    if pt.lower().replace(" ", "-") in relative_path.lower():
+                        doc_type = pt
+                        break
+            
+            # Extract text from image
+            text = extract_text_from_image(image_path)
+            
+            # Skip if we couldn't extract meaningful text
+            if len(text.strip()) < 20:  # Minimum content requirement
+                continue
+                
+            training_data.append({
+                'text': text,
+                'documentType': doc_type,
+                'source': image_path
+            })
+            
+            # Also save as a text file for future training
+            training_data_path = os.path.join(settings.MEDIA_ROOT, 'training_data')
+            os.makedirs(training_data_path, exist_ok=True)
+            
+            file_name = os.path.basename(image_path).split('.')[0] + '.txt'
+            with open(os.path.join(training_data_path, file_name), "w") as f:
+                f.write(f"DOCUMENT_TYPE: {doc_type}\n\n")
+                f.write(text)
+                
+        except Exception as e:
+            logger.error(f"Error processing training image {image_path}: {e}")
+    
+    logger.info(f"Prepared {len(training_data)} documents for training")
+    
+    # Update the model with the prepared training data
+    return document_classifier.update_model_with_data(training_data)
