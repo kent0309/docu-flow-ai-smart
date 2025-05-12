@@ -21,13 +21,18 @@ export const API_ENDPOINTS = {
 // Function to check if the backend is available
 export const checkBackendAvailability = async (): Promise<boolean> => {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+    
     const response = await fetch(API_ENDPOINTS.DOCUMENTS, {
       method: 'HEAD',
       headers: {
         'Content-Type': 'application/json',
       },
-      timeout: 3000, // 3 second timeout
+      signal: controller.signal,
     });
+    
+    clearTimeout(timeoutId);
     return response.ok;
   } catch (error) {
     console.warn('Backend API is not available:', error);
