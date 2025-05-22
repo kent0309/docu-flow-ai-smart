@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { Upload, X, FileType, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { processFiles } from '@/services/mock.service';
 
 interface FileUploaderProps {
   onFilesProcessed?: () => void;
@@ -49,7 +50,7 @@ const FileUploader = ({ onFilesProcessed }: FileUploaderProps) => {
     });
   };
 
-  const uploadFiles = () => {
+  const uploadFiles = async () => {
     if (files.length === 0) {
       toast.error('Please add at least one file to upload');
       return;
@@ -61,24 +62,36 @@ const FileUploader = ({ onFilesProcessed }: FileUploaderProps) => {
     // Simulate upload progress
     const interval = setInterval(() => {
       setProgress(prev => {
-        const newProgress = prev + 5;
-        if (newProgress >= 100) {
+        if (prev >= 90) {
           clearInterval(interval);
-          setTimeout(() => {
-            setUploading(false);
-            toast.success('Files processed successfully!');
-            setFiles([]);
-            
-            // Call the callback function if provided
-            if (onFilesProcessed) {
-              onFilesProcessed();
-            }
-          }, 500);
-          return 100;
+          return 90;
         }
-        return newProgress;
+        return prev + 5;
       });
     }, 200);
+    
+    try {
+      await processFiles(files);
+      
+      // Set to 100% when complete
+      setProgress(100);
+      setTimeout(() => {
+        setUploading(false);
+        setFiles([]);
+        
+        // Call the callback function if provided
+        if (onFilesProcessed) {
+          onFilesProcessed();
+        }
+      }, 500);
+      
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('An error occurred during file processing');
+      setUploading(false);
+    } finally {
+      clearInterval(interval);
+    }
   };
 
   const formatFileSize = (bytes: number) => {
@@ -94,8 +107,8 @@ const FileUploader = ({ onFilesProcessed }: FileUploaderProps) => {
       <div 
         {...getRootProps()} 
         className={cn(
-          "file-drop-area p-8 cursor-pointer text-center transition-all",
-          isDragActive ? "active" : "",
+          "border-2 border-dashed rounded-lg p-8 cursor-pointer text-center transition-all hover:border-primary/50",
+          isDragActive ? "border-primary bg-primary/5" : "border-border",
           uploading ? "opacity-50 pointer-events-none" : ""
         )}
       >

@@ -1,61 +1,122 @@
 
-// API configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+// Mock API configuration
+const API_BASE_URL = 'mock-api';
 
 export const API_ENDPOINTS = {
-  // Document endpoints
+  // Document endpoints (mock)
   DOCUMENTS: `${API_BASE_URL}/documents/`,
   DOCUMENT_DETAIL: (id: string) => `${API_BASE_URL}/documents/${id}/`,
   DOCUMENT_SUMMARIZE: (id: string) => `${API_BASE_URL}/documents/${id}/summarize/`,
   DOCUMENT_EXTRACT: (id: string) => `${API_BASE_URL}/documents/${id}/extract/`,
   
-  // Processed document endpoints
+  // Processed document endpoints (mock)
   PROCESSED_DOCUMENTS: `${API_BASE_URL}/processed-documents/`,
   PROCESSED_DOCUMENT_DETAIL: (id: string) => `${API_BASE_URL}/processed-documents/${id}/`,
   
-  // ML endpoints
+  // ML endpoints (mock)
   ML_TRAIN: `${API_BASE_URL}/ml/train/`,
   ML_STATS: `${API_BASE_URL}/ml/stats/`,
 };
 
-// Function to check if the backend is available
+// Mock backend available - always returns true since we're using mock data
 export const checkBackendAvailability = async (): Promise<boolean> => {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
-    
-    const response = await fetch(API_ENDPOINTS.DOCUMENTS, {
-      method: 'HEAD',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      signal: controller.signal,
-    });
-    
-    clearTimeout(timeoutId);
-    return response.ok;
-  } catch (error) {
-    console.warn('Backend API is not available:', error);
-    return false;
-  }
+  return true;
 };
 
-// Helper function to get a simple token for development purposes
-// In a real application, this would be replaced with proper authentication
+// Helper function to simulate authentication
 export const getAuthToken = (): string | null => {
-  return localStorage.getItem('auth_token');
+  return 'mock-auth-token';
 };
 
 // Common headers for API requests
 export const getCommonHeaders = () => {
-  const headers: Record<string, string> = {
+  return {
     'Content-Type': 'application/json',
+    'Authorization': 'Bearer mock-auth-token'
   };
-  
-  const token = getAuthToken();
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  
-  return headers;
+};
+
+// Mock data functions
+export const getMockDocuments = () => {
+  return [
+    {
+      id: '1',
+      filename: 'Invoice-May2025-12345.pdf',
+      type: 'invoice',
+      status: 'processed',
+      date: 'May 8, 2025',
+      confidence: 98
+    },
+    {
+      id: '2',
+      filename: 'Contract-ServiceAgreement.pdf',
+      type: 'contract',
+      status: 'processed',
+      date: 'May 7, 2025',
+      confidence: 95
+    },
+    {
+      id: '3',
+      filename: 'Receipt-Office-Supplies.jpg',
+      type: 'receipt',
+      status: 'processing',
+      date: 'May 8, 2025'
+    },
+    {
+      id: '4',
+      filename: 'Invoice-April2025-45678.pdf',
+      type: 'invoice',
+      status: 'processed',
+      date: 'Apr 29, 2025',
+      confidence: 92
+    },
+    {
+      id: '5',
+      filename: 'Contract-NDA-Client123.pdf',
+      type: 'contract',
+      status: 'error',
+      date: 'May 6, 2025'
+    },
+    {
+      id: '6',
+      filename: 'Receipt-Travel-Expenses.jpg',
+      type: 'receipt',
+      status: 'processed',
+      date: 'May 3, 2025',
+      confidence: 90
+    },
+    {
+      id: '7',
+      filename: 'Invoice-March2025-98765.pdf',
+      type: 'invoice',
+      status: 'processed',
+      date: 'Mar 15, 2025',
+      confidence: 97
+    },
+    {
+      id: '8',
+      filename: 'Report-Q1-2025.pdf',
+      type: 'report',
+      status: 'processed',
+      date: 'Apr 10, 2025',
+      confidence: 94
+    }
+  ];
+};
+
+// Mock ML stats
+export const getMockMLStats = () => {
+  return {
+    accuracy: 92.5,
+    totalDocuments: 1248,
+    classDistribution: {
+      invoice: 524,
+      contract: 312,
+      receipt: 289,
+      report: 103,
+      other: 20
+    },
+    lastTrainingDate: 'May 5, 2025',
+    confidenceThreshold: 85
+  };
 };

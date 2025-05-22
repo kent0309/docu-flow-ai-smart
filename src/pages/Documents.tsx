@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import DocumentGrid from '@/components/documents/DocumentGrid';
 import { Input } from '@/components/ui/input';
@@ -13,77 +13,30 @@ import {
   SortDesc
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
-const allDocuments = [
-  {
-    id: '1',
-    filename: 'Invoice-May2025-12345.pdf',
-    type: 'invoice' as const,
-    status: 'processed' as const,
-    date: 'May 8, 2025',
-    confidence: 98
-  },
-  {
-    id: '2',
-    filename: 'Contract-ServiceAgreement.pdf',
-    type: 'contract' as const,
-    status: 'processed' as const,
-    date: 'May 7, 2025',
-    confidence: 95
-  },
-  {
-    id: '3',
-    filename: 'Receipt-Office-Supplies.jpg',
-    type: 'receipt' as const,
-    status: 'processing' as const,
-    date: 'May 8, 2025'
-  },
-  {
-    id: '4',
-    filename: 'Invoice-April2025-45678.pdf',
-    type: 'invoice' as const,
-    status: 'processed' as const,
-    date: 'Apr 29, 2025',
-    confidence: 92
-  },
-  {
-    id: '5',
-    filename: 'Contract-NDA-Client123.pdf',
-    type: 'contract' as const,
-    status: 'error' as const,
-    date: 'May 6, 2025'
-  },
-  {
-    id: '6',
-    filename: 'Receipt-Travel-Expenses.jpg',
-    type: 'receipt' as const,
-    status: 'processed' as const,
-    date: 'May 3, 2025',
-    confidence: 90
-  },
-  {
-    id: '7',
-    filename: 'Invoice-March2025-98765.pdf',
-    type: 'invoice' as const,
-    status: 'processed' as const,
-    date: 'Mar 15, 2025',
-    confidence: 97
-  },
-  {
-    id: '8',
-    filename: 'Report-Q1-2025.pdf',
-    type: 'report' as const,
-    status: 'processed' as const,
-    date: 'Apr 10, 2025',
-    confidence: 94
-  }
-];
+import { fetchDocuments, Document } from '@/services/mock.service';
 
 const Documents = () => {
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
-  const filteredDocuments = allDocuments
+  useEffect(() => {
+    const loadDocuments = async () => {
+      try {
+        const docs = await fetchDocuments();
+        setDocuments(docs);
+      } catch (error) {
+        console.error('Error loading documents:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadDocuments();
+  }, []);
+  
+  const filteredDocuments = documents
     .filter(doc => 
       doc.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
       doc.type.toLowerCase().includes(searchQuery.toLowerCase())
@@ -150,7 +103,16 @@ const Documents = () => {
             <TabsTrigger value="error">Error</TabsTrigger>
           </TabsList>
           <TabsContent value="all" className="pt-4">
-            <DocumentGrid documents={filteredDocuments} />
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-pulse flex space-x-4">
+                  <div className="h-5 w-5 bg-primary/20 rounded-full"></div>
+                  <div className="h-5 w-24 bg-primary/20 rounded"></div>
+                </div>
+              </div>
+            ) : (
+              <DocumentGrid documents={filteredDocuments} />
+            )}
           </TabsContent>
           <TabsContent value="processed" className="pt-4">
             <DocumentGrid documents={filteredDocuments.filter(d => d.status === 'processed')} />
