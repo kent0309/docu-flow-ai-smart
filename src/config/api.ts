@@ -36,68 +36,71 @@ export const getCommonHeaders = () => {
   };
 };
 
+// Import the DocumentType from mock.service to ensure type consistency
+import { DocumentType, DocumentStatus } from "@/services/mock.service";
+
 // Mock data functions
 export const getMockDocuments = () => {
   return [
     {
       id: '1',
       filename: 'Invoice-May2025-12345.pdf',
-      type: 'invoice',
-      status: 'processed',
+      type: 'invoice' as DocumentType,
+      status: 'processed' as DocumentStatus,
       date: 'May 8, 2025',
       confidence: 98
     },
     {
       id: '2',
       filename: 'Contract-ServiceAgreement.pdf',
-      type: 'contract',
-      status: 'processed',
+      type: 'contract' as DocumentType,
+      status: 'processed' as DocumentStatus,
       date: 'May 7, 2025',
       confidence: 95
     },
     {
       id: '3',
       filename: 'Receipt-Office-Supplies.jpg',
-      type: 'receipt',
-      status: 'processing',
+      type: 'receipt' as DocumentType,
+      status: 'processing' as DocumentStatus,
       date: 'May 8, 2025'
     },
     {
       id: '4',
       filename: 'Invoice-April2025-45678.pdf',
-      type: 'invoice',
-      status: 'processed',
+      type: 'invoice' as DocumentType,
+      status: 'processed' as DocumentStatus,
       date: 'Apr 29, 2025',
       confidence: 92
     },
     {
       id: '5',
       filename: 'Contract-NDA-Client123.pdf',
-      type: 'contract',
-      status: 'error',
+      type: 'contract' as DocumentType,
+      status: 'error' as DocumentStatus,
       date: 'May 6, 2025'
     },
     {
       id: '6',
       filename: 'Receipt-Travel-Expenses.jpg',
-      type: 'receipt',
-      status: 'processed',
+      type: 'receipt' as DocumentType,
+      status: 'processed' as DocumentStatus,
       date: 'May 3, 2025',
       confidence: 90
     },
     {
       id: '7',
       filename: 'Invoice-March2025-98765.pdf',
-      type: 'invoice',
-      status: 'processed',
+      type: 'invoice' as DocumentType,
+      status: 'processed' as DocumentStatus,
       date: 'Mar 15, 2025',
       confidence: 97
     },
     {
       id: '8',
       filename: 'Report-Q1-2025.pdf',
-      type: 'report',
-      status: 'processed',
+      type: 'report' as DocumentType,
+      status: 'processed' as DocumentStatus,
       date: 'Apr 10, 2025',
       confidence: 94
     }

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { TrainModel } from 'lovable-icon';
+import { TrainModel } from '@/components/lovable-icon';
 import { trainModel } from '@/services/mock.service';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
@@ -51,19 +51,7 @@ const ModelTraining = () => {
               </>
             ) : (
               <>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4"
-                >
-                  <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
-                  <path d="M7 7h.01" />
-                </svg>
+                <TrainModel className="h-4 w-4" />
                 <span>Train Model</span>
               </>
             )}
