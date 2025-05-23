@@ -1,2 +1,0 @@
-
-# Initialize document processor project
