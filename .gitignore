@@ -22,3 +22,44 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.log
+
+# Virtual Environment
+venv/
+ENV/
+env/
+django_backend/venv/
+
+# Django
+*.sqlite3
+db.sqlite3
+media/
+static/
+logs/
+
+# Models and large files
+models/
+*.pt
+*.pth
+*.bin
+*.dll
+*.lib
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary files
+*.bak
+*.tmp
+*~
+.DS_Store
