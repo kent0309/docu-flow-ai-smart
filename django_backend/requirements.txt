@@ -1,0 +1,11 @@
+django
+djangorestframework
+django-cors-headers
+uvicorn
+python-dotenv
+torch
+transformers
+scikit-learn
+pytesseract
+pdf2image
+Pillow 
