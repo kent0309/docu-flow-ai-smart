@@ -1,29 +1,18 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import FileUploader from '@/components/documents/FileUploader';
-import DataExtractionView from '@/components/documents/DataExtractionView';
-import ModelTraining from '@/components/ml/ModelTraining';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Upload = () => {
-  const [showExtraction, setShowExtraction] = useState(false);
-
-  // Callback for when files are processed successfully
-  const handleFilesProcessed = () => {
-    // In a real app, this would be triggered by actual file processing
-    // For the demo, we'll just show the extraction section after "processing"
-    setShowExtraction(true);
-  };
-
   return (
     <MainLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Upload Documents</h1>
           <p className="text-muted-foreground mt-1">
-            Upload documents for AI-powered processing, data extraction, and summarization
+            Upload documents for AI-powered processing and data extraction
           </p>
         </div>
 
@@ -44,11 +33,9 @@ const Upload = () => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <FileUploader onFilesProcessed={handleFilesProcessed} />
+                    <FileUploader />
                   </CardContent>
                 </Card>
-
-                {showExtraction && <DataExtractionView />}
               </div>
               
               <div className="lg:col-span-1">
@@ -102,10 +89,6 @@ const Upload = () => {
                     </div>
                   </CardContent>
                 </Card>
-                
-                <div className="mt-6">
-                  <ModelTraining />
-                </div>
               </div>
             </div>
           </TabsContent>

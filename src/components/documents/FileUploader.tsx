@@ -6,13 +6,8 @@ import { Progress } from '@/components/ui/progress';
 import { Upload, X, FileType, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { processFiles } from '@/services/mock.service';
 
-interface FileUploaderProps {
-  onFilesProcessed?: () => void;
-}
-
-const FileUploader = ({ onFilesProcessed }: FileUploaderProps) => {
+const FileUploader = () => {
   const [files, setFiles] = useState<Array<File & { preview?: string }>>([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -50,7 +45,7 @@ const FileUploader = ({ onFilesProcessed }: FileUploaderProps) => {
     });
   };
 
-  const uploadFiles = async () => {
+  const uploadFiles = () => {
     if (files.length === 0) {
       toast.error('Please add at least one file to upload');
       return;
@@ -62,36 +57,19 @@ const FileUploader = ({ onFilesProcessed }: FileUploaderProps) => {
     // Simulate upload progress
     const interval = setInterval(() => {
       setProgress(prev => {
-        if (prev >= 90) {
+        const newProgress = prev + 5;
+        if (newProgress >= 100) {
           clearInterval(interval);
-          return 90;
+          setTimeout(() => {
+            setUploading(false);
+            toast.success('Files processed successfully!');
+            setFiles([]);
+          }, 500);
+          return 100;
         }
-        return prev + 5;
+        return newProgress;
       });
     }, 200);
-    
-    try {
-      await processFiles(files);
-      
-      // Set to 100% when complete
-      setProgress(100);
-      setTimeout(() => {
-        setUploading(false);
-        setFiles([]);
-        
-        // Call the callback function if provided
-        if (onFilesProcessed) {
-          onFilesProcessed();
-        }
-      }, 500);
-      
-    } catch (error) {
-      console.error('Upload error:', error);
-      toast.error('An error occurred during file processing');
-      setUploading(false);
-    } finally {
-      clearInterval(interval);
-    }
   };
 
   const formatFileSize = (bytes: number) => {
@@ -107,8 +85,8 @@ const FileUploader = ({ onFilesProcessed }: FileUploaderProps) => {
       <div 
         {...getRootProps()} 
         className={cn(
-          "border-2 border-dashed rounded-lg p-8 cursor-pointer text-center transition-all hover:border-primary/50",
-          isDragActive ? "border-primary bg-primary/5" : "border-border",
+          "file-drop-area p-8 cursor-pointer text-center transition-all",
+          isDragActive ? "active" : "",
           uploading ? "opacity-50 pointer-events-none" : ""
         )}
       >
