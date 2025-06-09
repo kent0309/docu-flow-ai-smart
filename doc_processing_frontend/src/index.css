@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+.file-drop-area {
+  border: 2px dashed theme('colors.muted');
+  background-color: theme('colors.background');
+}
+
+.file-drop-area.active {
+  border-color: theme('colors.primary');
+  background-color: theme('colors.primary.100');
+}
