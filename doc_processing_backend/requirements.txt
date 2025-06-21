@@ -1,0 +1,10 @@
+django
+djangorestframework
+django-cors-headers
+python-dotenv
+pytesseract
+Pillow
+pdf2image
+scikit-learn
+joblib 
+pandas
