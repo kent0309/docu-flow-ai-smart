@@ -1,11 +1,12 @@
-
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import MainLayout from '@/components/layout/MainLayout';
 import StatCard from '@/components/dashboard/StatCard';
 import ProcessingStats from '@/components/dashboard/ProcessingStats';
 import AIAccuracy from '@/components/dashboard/AIAccuracy';
 import DocumentGrid from '@/components/documents/DocumentGrid';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   FileText, 
   Clock, 
@@ -15,34 +16,30 @@ import {
   Upload
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
-const recentDocuments = [
-  {
-    id: '1',
-    filename: 'Invoice-May2025-12345.pdf',
-    type: 'invoice' as const,
-    status: 'processed' as const,
-    date: 'May 8, 2025',
-    confidence: 98
-  },
-  {
-    id: '2',
-    filename: 'Contract-ServiceAgreement.pdf',
-    type: 'contract' as const,
-    status: 'processed' as const,
-    date: 'May 7, 2025',
-    confidence: 95
-  },
-  {
-    id: '3',
-    filename: 'Receipt-Office-Supplies.jpg',
-    type: 'receipt' as const,
-    status: 'processing' as const,
-    date: 'May 8, 2025'
-  }
-];
+import { fetchDocuments, type Document } from '@/lib/api';
 
 const Dashboard = () => {
+  // Fetch documents from API using React Query with same queryKey for caching
+  const { data: documents = [], isLoading, isError } = useQuery({
+    queryKey: ['documents'],
+    queryFn: fetchDocuments,
+  });
+
+  // Calculate statistics dynamically from fetched data
+  const stats = useMemo(() => {
+    return {
+      total: documents.length,
+      processing: documents.filter(doc => doc.status === 'processing').length,
+      processed: documents.filter(doc => doc.status === 'processed').length,
+      errors: documents.filter(doc => doc.status === 'error').length,
+    };
+  }, [documents]);
+
+  // Get recent documents (latest 4)
+  const recentDocuments = useMemo(() => {
+    return documents.slice(0, 4);
+  }, [documents]);
+
   return (
     <MainLayout>
       <div className="space-y-8">
@@ -62,33 +59,44 @@ const Dashboard = () => {
         </div>
 
         <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            title="Total Documents"
-            value="1,248"
-            icon={<FileText className="h-5 w-5 text-primary" />}
-            description="Last 30 days"
-            trend={{ value: 12, isPositive: true }}
-          />
-          <StatCard
-            title="Processing"
-            value="3"
-            icon={<Clock className="h-5 w-5 text-blue-500" />}
-            description="Documents in queue"
-          />
-          <StatCard
-            title="Processed"
-            value="1,245"
-            icon={<CheckCircle className="h-5 w-5 text-green-500" />}
-            description="Successfully completed"
-            trend={{ value: 8, isPositive: true }}
-          />
-          <StatCard
-            title="Errors"
-            value="5"
-            icon={<AlertCircle className="h-5 w-5 text-red-500" />}
-            description="Requires attention"
-            trend={{ value: 2, isPositive: false }}
-          />
+          {isLoading ? (
+            <>
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-32 w-full" />
+            </>
+          ) : (
+            <>
+              <StatCard
+                title="Total Documents"
+                value={stats.total.toString()}
+                icon={<FileText className="h-5 w-5 text-primary" />}
+                description="All documents"
+                trend={{ value: 12, isPositive: true }}
+              />
+              <StatCard
+                title="Processing"
+                value={stats.processing.toString()}
+                icon={<Clock className="h-5 w-5 text-blue-500" />}
+                description="Documents in queue"
+              />
+              <StatCard
+                title="Processed"
+                value={stats.processed.toString()}
+                icon={<CheckCircle className="h-5 w-5 text-green-500" />}
+                description="Successfully completed"
+                trend={{ value: 8, isPositive: true }}
+              />
+              <StatCard
+                title="Errors"
+                value={stats.errors.toString()}
+                icon={<AlertCircle className="h-5 w-5 text-red-500" />}
+                description="Requires attention"
+                trend={{ value: 2, isPositive: false }}
+              />
+            </>
+          )}
         </div>
 
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
@@ -106,7 +114,15 @@ const Dashboard = () => {
               </Button>
             </Link>
           </div>
-          <DocumentGrid documents={recentDocuments} />
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <Skeleton key={index} className="h-48 w-full" />
+              ))}
+            </div>
+          ) : (
+            <DocumentGrid documents={recentDocuments} />
+          )}
         </div>
       </div>
     </MainLayout>
