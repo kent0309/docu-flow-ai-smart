@@ -1,9 +1,10 @@
-
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import MainLayout from '@/components/layout/MainLayout';
 import DocumentGrid from '@/components/documents/DocumentGrid';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Search, 
@@ -13,88 +14,115 @@ import {
   SortDesc
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
-const allDocuments = [
-  {
-    id: '1',
-    filename: 'Invoice-May2025-12345.pdf',
-    type: 'invoice' as const,
-    status: 'processed' as const,
-    date: 'May 8, 2025',
-    confidence: 98
-  },
-  {
-    id: '2',
-    filename: 'Contract-ServiceAgreement.pdf',
-    type: 'contract' as const,
-    status: 'processed' as const,
-    date: 'May 7, 2025',
-    confidence: 95
-  },
-  {
-    id: '3',
-    filename: 'Receipt-Office-Supplies.jpg',
-    type: 'receipt' as const,
-    status: 'processing' as const,
-    date: 'May 8, 2025'
-  },
-  {
-    id: '4',
-    filename: 'Invoice-April2025-45678.pdf',
-    type: 'invoice' as const,
-    status: 'processed' as const,
-    date: 'Apr 29, 2025',
-    confidence: 92
-  },
-  {
-    id: '5',
-    filename: 'Contract-NDA-Client123.pdf',
-    type: 'contract' as const,
-    status: 'error' as const,
-    date: 'May 6, 2025'
-  },
-  {
-    id: '6',
-    filename: 'Receipt-Travel-Expenses.jpg',
-    type: 'receipt' as const,
-    status: 'processed' as const,
-    date: 'May 3, 2025',
-    confidence: 90
-  },
-  {
-    id: '7',
-    filename: 'Invoice-March2025-98765.pdf',
-    type: 'invoice' as const,
-    status: 'processed' as const,
-    date: 'Mar 15, 2025',
-    confidence: 97
-  },
-  {
-    id: '8',
-    filename: 'Report-Q1-2025.pdf',
-    type: 'report' as const,
-    status: 'processed' as const,
-    date: 'Apr 10, 2025',
-    confidence: 94
-  }
-];
+import { fetchDocuments } from '@/lib/api';
 
 const Documents = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
-  const filteredDocuments = allDocuments
-    .filter(doc => 
-      doc.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.type.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-    .sort((a, b) => {
-      const dateA = new Date(a.date);
-      const dateB = new Date(b.date);
-      return sortOrder === 'asc' 
-        ? dateA.getTime() - dateB.getTime() 
-        : dateB.getTime() - dateA.getTime();
-    });
+  // Fetch documents from API using React Query
+  const { data = [], isLoading, isError } = useQuery({
+    queryKey: ['documents'],
+    queryFn: fetchDocuments,
+  });
+
+  // Handle loading state
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Documents</h1>
+              <p className="text-muted-foreground">
+                View and manage your processed documents
+              </p>
+            </div>
+            <Link to="/upload">
+              <Button>
+                <Upload className="h-4 w-4 mr-2" />
+                Upload New
+              </Button>
+            </Link>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search by filename or document type"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+                disabled
+              />
+            </div>
+            <Button variant="outline" size="icon" disabled>
+              <Filter className="h-4 w-4" />
+              <span className="sr-only">Filter</span>
+            </Button>
+            <Button variant="outline" size="icon" disabled>
+              <SortAsc className="h-4 w-4" />
+              <span className="sr-only">Sort</span>
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <Skeleton key={index} className="h-48 w-full" />
+            ))}
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // Handle error state
+  if (isError) {
+    return (
+      <MainLayout>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Documents</h1>
+              <p className="text-muted-foreground">
+                View and manage your processed documents
+              </p>
+            </div>
+            <Link to="/upload">
+              <Button>
+                <Upload className="h-4 w-4 mr-2" />
+                Upload New
+              </Button>
+            </Link>
+          </div>
+          
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center space-y-2">
+              <p className="text-destructive font-medium">Failed to load documents.</p>
+              <p className="text-muted-foreground">Please ensure the backend server is running.</p>
+            </div>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // Filter and sort live data with useMemo for performance
+  const filteredDocuments = useMemo(() => {
+    return data
+      .filter(doc => 
+        doc.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        doc.type.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+      .sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return sortOrder === 'asc' 
+          ? dateA.getTime() - dateB.getTime() 
+          : dateB.getTime() - dateA.getTime();
+      });
+  }, [data, searchQuery, sortOrder]);
 
   return (
     <MainLayout>
