@@ -8,7 +8,7 @@ from .serializers import DocumentSerializer
 
 # Import the AI services
 from .services.classification_service import classify_document
-from .services.extraction_service import extract_data
+from .services.extraction_service import extract_data, extract_data_from_document
 from .services.nlp_service import summarize_document
 
 def run_pipeline_in_background(document_id):
@@ -21,19 +21,26 @@ def run_pipeline_in_background(document_id):
 async def process_document_pipeline(document_id):
     """
     The main asynchronous AI processing pipeline.
-    This function will be executed in the background.
     """
     try:
-        # Use .aget() for asynchronous database fetching within an async function
         document = await Document.objects.aget(id=document_id)
         print(f"Starting AI pipeline for {document.filename}...")
 
         # --- AI PROCESSING STEPS ---
-        document.document_type = await classify_document(document.uploaded_file.path)
-        extracted_data = await extract_data(document.uploaded_file.path)
-        if extracted_data:
-            # Store the structured data returned by our extraction service
-            document.extracted_data = extracted_data
+
+        # 1. Extraction (gets the raw text first)
+        extracted_text = await extract_data_from_document(document.uploaded_file.path)
+        if extracted_text:
+            document.extracted_data = {'raw_text': extracted_text}
+        else:
+            # If extraction fails, we can't classify. Mark as error.
+            raise Exception("Failed to extract text for classification.")
+
+        # 2. Classification (uses the extracted text)
+        # The 'await' keyword has been removed from the line below, as classify_document is synchronous.
+        document.document_type = classify_document(extracted_text)
+        
+        # 3. Summarization (still a placeholder)
         document.summary = await summarize_document(document.uploaded_file.path)
         
         # --- FINAL STEP ---
@@ -50,7 +57,7 @@ async def process_document_pipeline(document_id):
             document_to_fail.status = "error"
             await document_to_fail.asave()
         except Document.DoesNotExist:
-            pass # Document was likely deleted, nothing more to do.
+            pass
 
 class DocumentViewSet(viewsets.ModelViewSet):
     """
