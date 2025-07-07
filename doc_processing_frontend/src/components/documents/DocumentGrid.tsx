@@ -1,12 +1,13 @@
-
 import React from 'react';
-import DocumentCard, { DocumentCardProps } from './DocumentCard';
+import DocumentCard from './DocumentCard';
+import { Document } from '@/lib/api';
 
 interface DocumentGridProps {
-  documents: DocumentCardProps[];
+  documents: Document[];
+  onDocumentClick?: (document: Document) => void;
 }
 
-const DocumentGrid = ({ documents }: DocumentGridProps) => {
+const DocumentGrid = ({ documents, onDocumentClick }: DocumentGridProps) => {
   if (documents.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -27,7 +28,11 @@ const DocumentGrid = ({ documents }: DocumentGridProps) => {
   return (
     <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {documents.map((doc) => (
-        <DocumentCard key={doc.id} {...doc} />
+        <DocumentCard 
+          key={doc.id} 
+          document={doc} 
+          onClick={() => onDocumentClick && onDocumentClick(doc)}
+        />
       ))}
     </div>
   );

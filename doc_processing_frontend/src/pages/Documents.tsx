@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import MainLayout from '@/components/layout/MainLayout';
 import DocumentGrid from '@/components/documents/DocumentGrid';
+import DocumentDetailView from '@/components/documents/DocumentDetailView';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -19,12 +20,20 @@ import { fetchDocuments } from '@/lib/api';
 const Documents = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [selectedDocument, setSelectedDocument] = useState<any>(null);
+  const [isDetailViewOpen, setIsDetailViewOpen] = useState(false);
   
   // Fetch documents from API using React Query
   const { data = [], isLoading, isError } = useQuery({
     queryKey: ['documents'],
     queryFn: fetchDocuments,
   });
+
+  // Handle document selection for viewing details
+  const handleDocumentClick = (document: any) => {
+    setSelectedDocument(document);
+    setIsDetailViewOpen(true);
+  };
 
   // Handle loading state
   if (isLoading) {
@@ -178,18 +187,25 @@ const Documents = () => {
             <TabsTrigger value="error">Error</TabsTrigger>
           </TabsList>
           <TabsContent value="all" className="pt-4">
-            <DocumentGrid documents={filteredDocuments} />
+            <DocumentGrid documents={filteredDocuments} onDocumentClick={handleDocumentClick} />
           </TabsContent>
           <TabsContent value="processed" className="pt-4">
-            <DocumentGrid documents={filteredDocuments.filter(d => d.status === 'processed')} />
+            <DocumentGrid documents={filteredDocuments.filter(d => d.status === 'processed')} onDocumentClick={handleDocumentClick} />
           </TabsContent>
           <TabsContent value="processing" className="pt-4">
-            <DocumentGrid documents={filteredDocuments.filter(d => d.status === 'processing')} />
+            <DocumentGrid documents={filteredDocuments.filter(d => d.status === 'processing')} onDocumentClick={handleDocumentClick} />
           </TabsContent>
           <TabsContent value="error" className="pt-4">
-            <DocumentGrid documents={filteredDocuments.filter(d => d.status === 'error')} />
+            <DocumentGrid documents={filteredDocuments.filter(d => d.status === 'error')} onDocumentClick={handleDocumentClick} />
           </TabsContent>
         </Tabs>
+        
+        {/* Document Detail View Modal */}
+        <DocumentDetailView 
+          document={selectedDocument} 
+          isOpen={isDetailViewOpen} 
+          onClose={() => setIsDetailViewOpen(false)} 
+        />
       </div>
     </MainLayout>
   );

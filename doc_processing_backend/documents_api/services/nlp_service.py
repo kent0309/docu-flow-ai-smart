@@ -30,8 +30,7 @@ except OSError:
 
 async def summarize_document(file_path):
     """
-    Document summarization service that extracts key information from documents
-    using a pre-trained transformer model.
+    Placeholder document summarization service.
     
     Args:
         file_path (str): Path to the uploaded document file
@@ -39,6 +38,7 @@ async def summarize_document(file_path):
     Returns:
         str: Generated summary of the document
     """
+    
     # Extract text from document
     extracted_text = await extract_text_for_nlp(file_path)
     
@@ -260,20 +260,20 @@ async def extract_text_for_nlp(file_path):
     
     # Return sample texts based on different document types
     sample_texts = [
-        """This invoice (#INV-4583) is from ABC Company for services rendered during Q2 2024. 
-        The total amount due is $2,475.00 with payment terms of Net 30. The invoice includes charges
-        for consulting services ($2,000.00), materials ($375.00), and applicable taxes ($100.00).
-        Please remit payment by August 15, 2024.""",
+        "This invoice (#INV-4583) is from ABC Company for services rendered during Q2 2024. "
+        "The total amount due is $2,475.00 with payment terms of Net 30. The invoice includes charges "
+        "for consulting services ($2,000.00), materials ($375.00), and applicable taxes ($100.00). "
+        "Please remit payment by August 15, 2024.",
         
-        """The quarterly financial report shows revenue of $1.2M, up 15% from last quarter.
-        Operating expenses were $850K, resulting in a net profit of $350K. Cash reserves stand at
-        $4.5M with $1.2M allocated for upcoming expansion. The board recommends increasing
-        investment in R&D by 10% next quarter.""",
+        "The quarterly financial report shows revenue of $1.2M, up 15% from last quarter. "
+        "Operating expenses were $850K, resulting in a net profit of $350K. Cash reserves stand at "
+        "$4.5M with $1.2M allocated for upcoming expansion. The board recommends increasing "
+        "investment in R&D by 10% next quarter.",
         
-        """This contract between XYZ Corp and ABC Ltd, effective from July 1, 2024, establishes
-        a partnership for software development services. The contract term is 24 months with
-        automatic renewal unless terminated with 60 days notice. Payment terms are Net 15 from
-        invoice date. Confidentiality provisions survive termination of this agreement."""
+        "This contract between XYZ Corp and ABC Ltd, effective from July 1, 2024, establishes "
+        "a partnership for software development services. The contract term is 24 months with "
+        "automatic renewal unless terminated with 60 days notice. Payment terms are Net 15 from "
+        "invoice date. Confidentiality provisions survive termination of this agreement."
     ]
     
     return random.choice(sample_texts)
@@ -521,3 +521,4 @@ async def extract_entities(text):
     except Exception as e:
         print(f"Error in entity extraction: {str(e)}")
         return {"error": str(e)} 
+

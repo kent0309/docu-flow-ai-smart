@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Document, Workflow, WorkflowStep
+from .models import Document, Workflow, WorkflowStep, ValidationRule
 
 
 class DocumentSerializer(serializers.ModelSerializer):
@@ -31,4 +31,16 @@ class WorkflowDetailSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Workflow
-        fields = ['id', 'name', 'description', 'is_active', 'created_at', 'steps'] 
+        fields = ['id', 'name', 'description', 'is_active', 'created_at', 'steps']
+
+class ValidationRuleSerializer(serializers.ModelSerializer):
+    """Serializer for validation rules that users can create and manage"""
+    
+    class Meta:
+        model = ValidationRule
+        fields = [
+            'id', 'name', 'document_type', 'field_name', 
+            'rule_type', 'rule_pattern', 'description', 
+            'is_active', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
