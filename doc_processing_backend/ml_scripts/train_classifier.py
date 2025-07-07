@@ -2,6 +2,7 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.svm import LinearSVC
 from sklearn.neural_network import MLPClassifier
+from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import Pipeline
 import joblib
 import os
@@ -92,6 +93,12 @@ text_clf_pipeline = Pipeline([
 #     ('tfidf', TfidfVectorizer(ngram_range=(1, 2), min_df=2, max_df=0.85)),
 #     ('clf', MLPClassifier(hidden_layer_sizes=(100,), max_iter=300, activation='relu', 
 #                         solver='adam', early_stopping=True, random_state=42)),
+# ])
+
+# Or use MultinomialNB for a simpler approach (was in the other branch)
+# text_clf_pipeline = Pipeline([
+#     ('tfidf', TfidfVectorizer(ngram_range=(1, 2), min_df=2, max_df=0.85)),
+#     ('clf', MultinomialNB()),
 # ])
 
 # Train the model on the new, larger dataset

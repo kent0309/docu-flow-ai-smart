@@ -646,220 +646,36 @@ async def process_document_with_llm(text_content: str) -> Dict[str, Any]:
         
         # Create a detailed prompt for the LLM with few-shot examples
         prompt = f"""
-        You are an expert document analyzer with exceptional skills in document classification, data extraction, and summarization.
+You are a highly intelligent document processing AI. Your sole purpose is to analyze the provided text and return a single, perfectly formatted JSON object. You must not, under any circumstances, provide any explanatory text, apologies, or markdown formatting like ```json before or after the JSON object.
+
+Based on the text below, provide a JSON object with the following structure:
+{{
+  "document_type": "Classify the document into ONE of the following categories: 'Email' (for electronic correspondence), 'Letter' (for formal physical correspondence), 'Invoice' (for billing), 'Receipt' (for proof of purchase), 'Contract' (for legal agreements), 'Report' (for detailed informational summaries), 'Form' (for documents with fields to be filled out), or 'Other'.",
+  "detected_language": "The primary language of the document, identified by its two-letter ISO 639-1 code (e.g., 'en' for English, 'es' for Spanish).",
+  "summary": "A detailed, multi-sentence summary in a single paragraph that captures the key purpose, main topics, and any critical actions or conclusions mentioned in the document.",
+  "extracted_data": {{
+    "//": "Identify every distinct piece of information, label it with a clear, camelCase key, and extract its value exactly as it appears in the text. This should be a comprehensive extraction of all available data."
+  }}
+}}
+
+Here is the document text to analyze:
+---
+{text_content}
+---
+
+CRITICAL REMINDER: Your entire response must be ONLY the JSON object and nothing else.
+"""
         
-        Your task is to analyze the following document text and extract structured information that will be used in a document processing system.
-        
-        # DATA FORMATTING INSTRUCTIONS:
-        - Your primary goal is to act as a data entry specialist. Identify every distinct piece of information, label it with a clear, camelCase key, and extract its value exactly as it appears in the text.
-        - For any dates found, format them as YYYY-MM-DD.
-        - For monetary values, extract only the numerical value without the currency symbol.
-        - For each extracted field, include a confidence score ("High", "Medium", or "Low") indicating your certainty.
-        - If you can't determine certain information, use null values rather than making up information.
-        - Format all extracted values consistently (e.g., phone numbers as XXX-XXX-XXXX).
-        
-        # FEW-SHOT EXAMPLES:
-        
-        ## Example 1: Invoice
-        
-        ```
-        INVOICE
-        
-        Invoice #: INV-2023-0042
-        Date: 01/15/2023
-        Due Date: 02/15/2023
-        
-        From:
-        ABC Company Inc.
-        123 Business St.
-        New York, NY 10001
-        
-        To:
-        XYZ Corporation
-        456 Corporate Ave.
-        Chicago, IL 60601
-        
-        Items:
-        1. Web Development Services - $2,500.00
-        2. Server Maintenance (10 hrs @ $75/hr) - $750.00
-        
-        Subtotal: $3,250.00
-        Tax (8%): $260.00
-        Total: $3,510.00
-        
-        Payment Status: Unpaid
-        Payment Terms: Net 30
-        ```
-        
-        Expected JSON output:
-        ```json
-        {
-          "document_type": "Invoice",
-          "extracted_data": {
-            "invoice_number": {
-              "value": "INV-2023-0042",
-              "confidence": "High"
-            },
-            "date": {
-              "value": "2023-01-15",
-              "confidence": "High"
-            },
-            "due_date": {
-              "value": "2023-02-15",
-              "confidence": "High"
-            },
-            "total_amount": {
-              "value": 3510.00,
-              "confidence": "High"
-            },
-            "vendor": {
-              "value": "ABC Company Inc.",
-              "confidence": "High"
-            },
-            "customer": {
-              "value": "XYZ Corporation",
-              "confidence": "High"
-            },
-            "line_items": [
-              {
-                "description": "Web Development Services",
-                "amount": 2500.00,
-                "confidence": "High"
-              },
-              {
-                "description": "Server Maintenance (10 hrs @ $75/hr)",
-                "amount": 750.00,
-                "confidence": "High"
-              }
-            ],
-            "tax_amount": {
-              "value": 260.00,
-              "confidence": "High"
-            },
-            "payment_status": {
-              "value": "Unpaid",
-              "confidence": "High"
-            }
-          },
-          "summary": "Invoice from ABC Company Inc. to XYZ Corporation for web development and server maintenance services totaling $3,510.00, due on February 15, 2023."
+        # Define safety settings to prevent AI safety filters from blocking valid responses
+        safety_settings = {
+            'HATE_SPEECH': 'BLOCK_NONE',
+            'HARASSMENT': 'BLOCK_NONE',
+            'SEXUALLY_EXPLICIT': 'BLOCK_NONE',
+            'DANGEROUS_CONTENT': 'BLOCK_NONE',
         }
-        ```
         
-        ## Example 2: Email
-        
-        ```
-        From: john.smith@example.com
-        To: sarah.jones@company.org
-        Subject: Project Update Meeting - March 15
-        Date: March 10, 2023 10:15 AM
-        
-        Hi Sarah,
-        
-        I wanted to follow up on our discussion about the client project. Can we schedule a meeting for next Wednesday at 2 PM to review progress?
-        
-        I've attached the latest project timeline for your review. Please let me know if you have any questions before the meeting.
-        
-        Best regards,
-        John Smith
-        Senior Project Manager
-        Phone: 555-123-4567
-        ```
-        
-        Expected JSON output:
-        ```json
-        {
-          "document_type": "Email",
-          "extracted_data": {
-            "sender": {
-              "value": "john.smith@example.com",
-              "confidence": "High"
-            },
-            "recipient": {
-              "value": "sarah.jones@company.org",
-              "confidence": "High"
-            },
-            "subject": {
-              "value": "Project Update Meeting - March 15",
-              "confidence": "High"
-            },
-            "date": {
-              "value": "2023-03-10",
-              "confidence": "High"
-            },
-            "body": {
-              "value": "Hi Sarah,\\n\\nI wanted to follow up on our discussion about the client project. Can we schedule a meeting for next Wednesday at 2 PM to review progress?\\n\\nI've attached the latest project timeline for your review. Please let me know if you have any questions before the meeting.\\n\\nBest regards,\\nJohn Smith\\nSenior Project Manager\\nPhone: 555-123-4567",
-              "confidence": "High"
-            },
-            "attachments": {
-              "value": "project timeline",
-              "confidence": "Medium"
-            },
-            "contact_info": {
-              "value": "Phone: 555-123-4567",
-              "confidence": "High"
-            }
-          },
-          "summary": "Email from John Smith to Sarah Jones requesting a project update meeting on March 15 at 2 PM and mentioning an attached project timeline."
-        }
-        ```
-        
-        # TASK:
-        Please analyze the document thoroughly and return a valid JSON object with EXACTLY the following three keys:
-        
-        1. document_type: Classify the document into one of the following categories based on its content and structure: 'Email', 'Invoice', 'Receipt', 'Contract', 'Report', 'Form', 'Advertisement', 'Other'. Use these definitions: 'Invoice' for billing and payment requests; 'Receipt' for proof of purchase; 'Contract' for legal agreements; 'Report' for detailed informational summaries; 'Form' for documents with fields to be filled out; 'Email' for electronic correspondence.
-        
-        2. detected_language: The primary language of the document, identified by its two-letter ISO 639-1 code (e.g., 'en' for English, 'es' for Spanish, 'ja' for Japanese).
-        
-        3. extracted_data: Extract all relevant key information from the document as a structured JSON object with key-value pairs.
-           For each field, include both the extracted value and a confidence score.
-           Adapt the keys based on the document type you identified:
-           
-           - For Email:
-             * sender: The email address and/or name of the sender
-             * recipient: The email address and/or name of the recipient
-             * subject: The email subject line
-             * date: The date the email was sent (in YYYY-MM-DD format)
-             * cc: Carbon copy recipients (if present)
-             * body: The main content of the email
-             * attachments: Names of any attachments mentioned (if present)
-             * contact_info: Any phone numbers, addresses, or other contact details mentioned
-           
-           - For Invoice/Receipt:
-             * invoice_number/receipt_number: The unique identifier
-             * date: The invoice/receipt date (in YYYY-MM-DD format)
-             * due_date: Payment due date (for invoices) (in YYYY-MM-DD format)
-             * total_amount: The total amount due/paid (numeric value only)
-             * vendor/merchant: The company/person issuing the invoice/receipt
-             * customer: The entity being billed
-             * line_items: Array of items with descriptions, quantities, and prices
-             * payment_method: How payment was made (for receipts)
-             * tax_amount: Any tax included (numeric value only)
-             * billing_address: Address information
-             * payment_status: Whether paid or not (if mentioned)
-           
-           - For Contract:
-             * parties: The entities involved in the agreement
-             * effective_date: When the contract takes effect (in YYYY-MM-DD format)
-             * termination_date: When the contract ends (if specified) (in YYYY-MM-DD format)
-             * contract_type: The specific type of contract
-             * key_terms: Important conditions and obligations
-             * signatories: Who signed the contract
-             * value: The monetary value (if applicable) (numeric value only)
-           
-           - For other document types:
-             * Extract any relevant key-value pairs you find, using appropriate field names
-        
-        4. summary: Write a detailed, multi-sentence summary in a single paragraph that captures the key purpose, main topics, and any critical actions or conclusions mentioned in the document.
-        
-        Here is the document text to analyze:
-        
-        {text_content}
-        
-        CRITICAL: You must only respond with a single, valid JSON object and nothing else. Do not include any introductory text, explanations, or markdown formatting like ```json. Your entire response must be a valid JSON object that can be parsed directly.
-        """
-        
-        # Initialize the Gemini model
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        # Initialize the Gemini model with safety settings
+        model = genai.GenerativeModel('gemini-1.5-flash-latest', safety_settings=safety_settings)
         
         # Configure generation parameters
         generation_config = {
@@ -877,20 +693,38 @@ async def process_document_with_llm(text_content: str) -> Dict[str, Any]:
             generation_config=generation_config
         )
         
+        # Log the raw response for debugging
+        print("--- RAW LLM RESPONSE ---")
+        print(response.text)
+        print("--- END RAW LLM RESPONSE ---")
+        
         # Extract the response content
         llm_response = response.text
+        
+        # Check if response looks like a JSON object before parsing
+        if not llm_response or not llm_response.strip():
+            raise ValueError("Empty response received from LLM")
+        
+        # Check if the response at least starts and ends with curly braces (basic JSON structure)
+        trimmed_response = llm_response.strip()
+        if not (trimmed_response.startswith('{') and trimmed_response.endswith('}')):
+            print(f"Warning: Response doesn't appear to be a valid JSON object: {trimmed_response[:100]}...")
         
         try:
             # Try parsing the response directly as JSON first
             result = json.loads(llm_response)
-        except json.JSONDecodeError:
+            print("Successfully parsed JSON response")
+        except json.JSONDecodeError as e:
+            print(f"JSON parsing error: {str(e)}")
             # Fall back to regex extraction if direct parsing fails
             # Try to find JSON object in the response (it might be wrapped in markdown code blocks)
             json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', llm_response)
             if json_match:
                 json_str = json_match.group(1)
+                print(f"Extracted JSON from code block: {json_str[:100]}...")
             else:
                 json_str = llm_response
+                print("No code block found, using raw response")
             
             # Clean up any non-JSON text that might be present
             json_str = re.sub(r'^[^{]*', '', json_str)
@@ -898,11 +732,19 @@ async def process_document_with_llm(text_content: str) -> Dict[str, Any]:
             
             try:
                 result = json.loads(json_str)
-            except json.JSONDecodeError:
+                print("Successfully parsed JSON after cleanup")
+            except json.JSONDecodeError as nested_e:
                 # If JSON parsing fails, try to fix common issues
+                print(f"JSON parsing still failed after cleanup: {str(nested_e)}")
                 # Remove any trailing commas before closing braces/brackets
                 json_str = re.sub(r',(\s*[\]}])', r'\1', json_str)
-                result = json.loads(json_str)
+                print(f"Attempting final cleanup and parse: {json_str[:100]}...")
+                try:
+                    result = json.loads(json_str)
+                    print("Successfully parsed JSON after final cleanup")
+                except json.JSONDecodeError as final_e:
+                    print(f"All JSON parsing attempts failed: {str(final_e)}")
+                    raise ValueError(f"Failed to parse LLM response as JSON: {str(final_e)}")
         
         # Validate the result has the expected structure
         if not all(key in result for key in ['document_type', 'detected_language', 'extracted_data', 'summary']):

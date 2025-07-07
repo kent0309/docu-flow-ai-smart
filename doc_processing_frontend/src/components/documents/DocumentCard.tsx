@@ -1,136 +1,96 @@
-
 import React from 'react';
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { 
-  Eye, 
-  Download, 
-  MoreVertical,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  FileText,
-  FileSpreadsheet,
-  FileCode,
-  File
-} from 'lucide-react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
+import { Badge } from '../ui/badge';
+import { FileText, FileSpreadsheet, FileImage, Mail, FileCode, FilePenLine, File } from 'lucide-react';
+import { Document } from '@/lib/api';
 
-export type DocumentStatus = 'processing' | 'processed' | 'error';
-export type DocumentType = 'invoice' | 'contract' | 'receipt' | 'report' | 'other';
-
-export interface DocumentCardProps {
-  id: string;
-  filename: string;
-  type: DocumentType;
-  status: DocumentStatus;
-  date: string;
-  confidence?: number;
+interface DocumentCardProps {
+  document: Document;
+  onClick?: () => void;
 }
 
-const getDocumentIcon = (type: DocumentType) => {
-  switch (type) {
-    case 'invoice':
-      return <FileSpreadsheet className="h-6 w-6" />;
-    case 'contract':
-      return <FileText className="h-6 w-6" />;
-    case 'receipt':
-      return <FileCode className="h-6 w-6" />;
-    default:
-      return <File className="h-6 w-6" />;
-  }
-};
+const DocumentCard: React.FC<DocumentCardProps> = ({ document, onClick }) => {
+  // Helper function to get icon based on document type
+  const getDocumentIcon = () => {
+    const type = document.document_type?.toLowerCase() || 'unknown';
+    
+    if (type === 'email' || document.document_subtype === 'email') {
+      return <Mail className="h-10 w-10 text-blue-500" />;
+    } else if (type === 'invoice' || type === 'receipt') {
+      return <FileSpreadsheet className="h-10 w-10 text-green-500" />;
+    } else if (type === 'form') {
+      return <FilePenLine className="h-10 w-10 text-purple-500" />;
+    } else if (type === 'contract' || type === 'legal') {
+      return <FileText className="h-10 w-10 text-amber-500" />;
+    } else if (type === 'report') {
+      return <FileCode className="h-10 w-10 text-cyan-500" />;
+    } else {
+      return <File className="h-10 w-10 text-gray-500" />;
+    }
+  };
+  
+  // Helper function to get status color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'processed':
+        return 'bg-green-500';
+      case 'processing':
+        return 'bg-blue-500';
+      case 'error':
+        return 'bg-red-500';
+      default:
+        return 'bg-gray-500';
+    }
+  };
+  
+  // Format document type for display
+  const getFormattedDocumentType = () => {
+    if (document.document_type === 'unknown' || !document.document_type) {
+      return 'Unknown Type';
+    }
 
-const getStatusIcon = (status: DocumentStatus) => {
-  switch (status) {
-    case 'processing':
-      return <Clock className="h-4 w-4 text-blue-500" />;
-    case 'processed':
-      return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-    case 'error':
-      return <AlertCircle className="h-4 w-4 text-red-500" />;
-    default:
-      return null;
-  }
-};
+    // Check for email subtype
+    if (document.document_type === 'email' || document.document_subtype === 'email') {
+      return 'Email';
+    }
+    
+    // Capitalize the document type
+    return document.document_type.charAt(0).toUpperCase() + document.document_type.slice(1);
+  };
 
-const getStatusColor = (status: DocumentStatus) => {
-  switch (status) {
-    case 'processing':
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
-    case 'processed':
-      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
-    case 'error':
-      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
-    default:
-      return "";
-  }
-};
-
-const DocumentCard = ({ 
-  id, 
-  filename, 
-  type, 
-  status, 
-  date, 
-  confidence = 0 
-}: DocumentCardProps) => {
   return (
-    <Card className="overflow-hidden transition-all hover:shadow-md">
-      <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
-        <div className="flex items-center space-x-2">
-          <div className="rounded-md bg-primary/10 p-2">
-            {getDocumentIcon(type)}
-          </div>
-          <div>
-            <p className="text-sm font-medium">{type.charAt(0).toUpperCase() + type.slice(1)}</p>
-          </div>
+    <Card 
+      className="cursor-pointer transition-all hover:bg-muted/50 group overflow-hidden"
+      onClick={onClick}
+    >
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-start">
+          <CardTitle className="text-lg line-clamp-1 group-hover:text-primary">
+            {document.filename}
+          </CardTitle>
+          <Badge className={`${getStatusColor(document.status)} text-white`}>
+            {document.status}
+          </Badge>
         </div>
-        <Badge variant="outline" className={getStatusColor(status)}>
-          <div className="flex items-center gap-1">
-            {getStatusIcon(status)}
-            <span>{status.charAt(0).toUpperCase() + status.slice(1)}</span>
-          </div>
-        </Badge>
+        <CardDescription className="flex justify-between">
+          <span>{document.date}</span>
+          {document.confidence !== undefined && (
+            <span className="text-xs">
+              AI Confidence: {document.confidence}%
+            </span>
+          )}
+        </CardDescription>
       </CardHeader>
-      <CardContent className="p-4 pt-2">
-        <h3 className="font-medium truncate" title={filename}>
-          {filename}
-        </h3>
-        <p className="text-xs text-muted-foreground mt-1">
-          Uploaded on {date}
-        </p>
-        
-        {status === 'processed' && (
-          <div className="mt-3">
-            <div className="flex justify-between text-xs mb-1">
-              <span>AI Confidence</span>
-              <span>{confidence}%</span>
-            </div>
-            <div className="w-full bg-muted rounded-full h-1.5">
-              <div 
-                className="h-1.5 rounded-full bg-primary" 
-                style={{ width: `${confidence}%` }}
-              ></div>
-            </div>
-          </div>
-        )}
+      <CardContent className="flex items-center justify-center py-6">
+        {getDocumentIcon()}
       </CardContent>
-      <CardFooter className="p-4 pt-0 gap-2">
-        <Button variant="outline" size="sm" className="flex-1">
-          <Eye className="h-3.5 w-3.5 mr-1" />
-          <span>View</span>
-        </Button>
-        <Button variant="outline" size="sm" className="flex-1">
-          <Download className="h-3.5 w-3.5 mr-1" />
-          <span>Download</span>
-        </Button>
-        <Button variant="ghost" size="icon" className="ml-auto">
-          <MoreVertical className="h-4 w-4" />
-        </Button>
+      <CardFooter className="bg-muted/50 py-2 px-6 flex justify-center">
+        <span className="text-sm font-medium text-muted-foreground">
+          {getFormattedDocumentType()}
+        </span>
       </CardFooter>
     </Card>
   );
-};
+}
 
 export default DocumentCard;

@@ -1,10 +1,14 @@
 import joblib
 import os
+
 import numpy as np
 from langdetect import detect, LangDetectException
 import re
 
 # Path to the classification model
+
+from langdetect import detect, LangDetectException
+
 model_path = os.path.join(os.path.dirname(__file__), '..', '..', 'ml_models', 'document_classifier_pipeline.joblib')
 try:
     classifier_pipeline = joblib.load(model_path)
@@ -339,3 +343,20 @@ def get_language_confidence(text_content, target_languages=None):
             return {}
     except LangDetectException:
         return {}
+def classify_document(text_content):
+    if not classifier_pipeline or not text_content:
+        return "unknown"
+    try:
+        prediction = classifier_pipeline.predict([text_content])
+        return prediction[0]
+    except Exception as e:
+        print(f"Error during classification: {e}")
+        return "error"
+
+def detect_document_language(text_content):
+    try:
+        if text_content and len(text_content.strip()) > 20:
+            return detect(text_content)
+        return "unknown"
+    except LangDetectException:
+        return "unknown"
