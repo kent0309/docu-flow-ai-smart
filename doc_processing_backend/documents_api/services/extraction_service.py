@@ -538,7 +538,7 @@ def calculate_skew_angle(image):
 
 async def extract_data_from_document(file_path):
     """
-    Extract text content from uploaded documents using OCR.
+    Extract text content from uploaded documents using OCR with sophisticated image preprocessing.
     
     Args:
         file_path (str): Path to the document file
@@ -568,31 +568,95 @@ async def extract_data_from_document(file_path):
                 print(f"Failed to read image file: {file_path}")
                 return ""
             
-            # Step 2: Calculate skew angle
-            skew_angle = calculate_skew_angle(image)
+            # Save original image for potential fallback
+            original_image = image.copy()
             
-            # Step 3: Apply deskewing only if the image is significantly skewed (more than 1 degree)
-            if abs(skew_angle) > 1.0:
-                print(f"Correcting image skew of {skew_angle:.2f} degrees")
-                (h, w) = image.shape[:2]
-                center = (w // 2, h // 2)
-                rotation_matrix = cv2.getRotationMatrix2D(center, skew_angle, 1.0)
-                image = cv2.warpAffine(image, rotation_matrix, (w, h), 
-                                      flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
-                
-            # Step 4: Convert to Grayscale
+            # Step 2: Convert to Grayscale
             gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             
-            # Step 5: Apply a simple binary threshold using Otsu's method
-            processed_image = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+            # Step 3: Apply Bilateral Filter for Noise Reduction
+            # This preserves edges while removing noise
+            filtered_image = cv2.bilateralFilter(gray_image, 9, 75, 75)
             
-            # Step 6: Pass the Processed Image to Tesseract
-            extracted_text = pytesseract.image_to_string(processed_image)
+            # Step 4: Apply Otsu's Thresholding
+            # Automatically finds optimal threshold value for images with non-uniform lighting
+            binary_image = cv2.threshold(filtered_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
             
-            # Post-process and clean up the text
-            extracted_text = extracted_text.strip()
+            # Step 5: Apply morphological operations to clean up the image
+            # Create a kernel for morphological operations
+            kernel = np.ones((1, 1), np.uint8)
+            # Apply morphological operations to clean up the image
+            cleaned_image = cv2.morphologyEx(binary_image, cv2.MORPH_CLOSE, kernel)
             
-            return extracted_text
+            # Step 6: Deskew the image (correct rotation)
+            skew_angle = calculate_skew_angle(cleaned_image)
+            if abs(skew_angle) > 0.5:
+                print(f"Correcting image skew of {skew_angle:.2f} degrees")
+                (h, w) = cleaned_image.shape[:2]
+                center = (w // 2, h // 2)
+                rotation_matrix = cv2.getRotationMatrix2D(center, skew_angle, 1.0)
+                cleaned_image = cv2.warpAffine(
+                    cleaned_image, 
+                    rotation_matrix, 
+                    (w, h), 
+                    flags=cv2.INTER_CUBIC, 
+                    borderMode=cv2.BORDER_REPLICATE
+                )
+            
+            # Step 7: Try multiple Tesseract configurations and pick the best result
+            results = []
+            
+            # Different PSM modes to try
+            psm_modes = [
+                "--oem 3 --psm 6",  # Assume single uniform block of text
+                "--oem 3 --psm 3",  # Auto-detect page layout
+                "--oem 3 --psm 4",  # Single column of text
+                "--oem 3 --psm 1"   # Automatic page segmentation with OSD
+            ]
+            
+            # Try different image processing variants
+            images_to_try = [
+                ("cleaned_binary", cleaned_image),
+                ("original_grayscale", gray_image),
+                ("bilateral_filtered", filtered_image)
+            ]
+            
+            # Try each combination
+            for img_name, img in images_to_try:
+                for psm in psm_modes:
+                    try:
+                        text = pytesseract.image_to_string(img, config=psm)
+                        text = text.strip()
+                        
+                        # Calculate a quality score based on text length and ratio of alphanumeric characters
+                        if text:
+                            alphanumeric_chars = sum(c.isalnum() for c in text)
+                            total_chars = max(1, len(text))  # Avoid division by zero
+                            quality_score = (alphanumeric_chars / total_chars) * len(text)
+                            
+                            results.append({
+                                "text": text,
+                                "quality_score": quality_score,
+                                "method": f"{img_name} with {psm}"
+                            })
+                            
+                            print(f"Method: {img_name} with {psm}")
+                            print(f"Quality score: {quality_score}")
+                            print(f"Text preview: {text[:100]}...")
+                    except Exception as e:
+                        print(f"Error with {img_name} and {psm}: {str(e)}")
+            
+            # If we have results, select the best one
+            if results:
+                # Sort by quality score
+                results.sort(key=lambda x: x["quality_score"], reverse=True)
+                best_result = results[0]
+                print(f"Selected best OCR result: {best_result['method']} with score {best_result['quality_score']}")
+                return best_result["text"]
+            
+            # Fallback to original image with default settings if all else fails
+            print("All processing methods failed, falling back to default OCR on original image")
+            return pytesseract.image_to_string(original_image).strip()
             
         elif file_extension == '.pdf':
             # For PDFs, use pdfplumber
@@ -645,18 +709,28 @@ async def process_document_with_llm(text_content: str) -> Dict[str, Any]:
         genai.configure(api_key=api_key)
         
         # Create a detailed prompt for the LLM with few-shot examples
-        prompt = f"""
+        prompt = """
 You are a highly intelligent document processing AI. Your sole purpose is to analyze the provided text and return a single, perfectly formatted JSON object. You must not, under any circumstances, provide any explanatory text, apologies, or markdown formatting like ```json before or after the JSON object.
 
 Based on the text below, provide a JSON object with the following structure:
-{{
-  "document_type": "Classify the document into ONE of the following categories: 'Email' (for electronic correspondence), 'Letter' (for formal physical correspondence), 'Invoice' (for billing), 'Receipt' (for proof of purchase), 'Contract' (for legal agreements), 'Report' (for detailed informational summaries), 'Form' (for documents with fields to be filled out), or 'Other'.",
+{
+  "document_type": "Classify the document into ONE of the following specific categories. Use keywords to help you decide: 
+    'Advertisement' (if the primary purpose is to promote a product, and it contains coupons, offers, promotional language, product displays, marketing copy, calls to action, special deals, event announcements, price highlights, or branded content),
+    'Form' (if it has fields for signatures, dates, approvals, or information to be filled in, including blank lines, checkboxes, radio buttons, dropdown indicators, submission instructions, or form validation instructions),
+    'Email' (if it shows sender/receiver addresses, subject line, message body, email headers, signature block),
+    'Letter' (if it contains letterhead, formal greeting, signature, date line, recipient address block),
+    'Invoice' (if it shows payment terms, itemized lists with prices, invoice numbers, billing addresses),
+    'Receipt' (if it shows transaction records, paid amounts, merchant details, payment confirmation),
+    'Contract' (if it contains legal terms, party names, obligations, clauses, termination conditions),
+    'Report' (if it contains data analysis, findings, summaries, recommendations),
+    'Other' (ONLY use this if the document truly doesn't fit any of the above categories).",
   "detected_language": "The primary language of the document, identified by its two-letter ISO 639-1 code (e.g., 'en' for English, 'es' for Spanish).",
   "summary": "A detailed, multi-sentence summary in a single paragraph that captures the key purpose, main topics, and any critical actions or conclusions mentioned in the document.",
-  "extracted_data": {{
+  "sentiment": "Analyze the overall tone of the document and classify it as 'Positive', 'Negative', or 'Neutral'.",
+  "extracted_data": {
     "//": "Identify every distinct piece of information, label it with a clear, camelCase key, and extract its value exactly as it appears in the text. This should be a comprehensive extraction of all available data."
-  }}
-}}
+  }
+}
 
 Here is the document text to analyze:
 ---

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Document, Workflow, WorkflowStep
+from .models import Document, Workflow, WorkflowStep, ValidationRule, Notification
 
 # Register your models here.
 
@@ -31,3 +31,19 @@ class WorkflowStepAdmin(admin.ModelAdmin):
     list_filter = ['workflow']
     search_fields = ['name', 'description']
     ordering = ['workflow', 'step_order']
+
+@admin.register(ValidationRule)
+class ValidationRuleAdmin(admin.ModelAdmin):
+    list_display = ['name', 'document_type', 'field_name', 'rule_type', 'is_active']
+    list_filter = ['document_type', 'rule_type', 'is_active', 'created_at']
+    search_fields = ['name', 'document_type', 'field_name', 'description']
+    readonly_fields = ['id', 'created_at']
+    ordering = ['-created_at']
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ['recipient_email', 'subject', 'sent_status', 'created_at', 'sent_at']
+    list_filter = ['sent_status', 'created_at']
+    search_fields = ['recipient_email', 'subject', 'message']
+    readonly_fields = ['id', 'created_at']
+    ordering = ['-created_at']

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Document, Workflow, WorkflowStep, ValidationRule
+from .models import Document, Workflow, WorkflowStep, ValidationRule, Notification
 
 
 class DocumentSerializer(serializers.ModelSerializer):
@@ -10,7 +10,7 @@ class DocumentSerializer(serializers.ModelSerializer):
         # Make filename read-only because we will set it automatically in the view.
         extra_kwargs = {
             'filename': {'read_only': True}
-        } 
+        }
 
 class WorkflowStepSerializer(serializers.ModelSerializer):
     class Meta:
@@ -44,3 +44,25 @@ class ValidationRuleSerializer(serializers.ModelSerializer):
             'is_active', 'created_at'
         ]
         read_only_fields = ['id', 'created_at']
+
+class NotificationSerializer(serializers.ModelSerializer):
+    """Serializer for workflow notifications"""
+    
+    document_filename = serializers.SerializerMethodField()
+    workflow_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Notification
+        fields = [
+            'id', 'recipient_email', 'subject', 'message',
+            'sent_status', 'document', 'workflow', 
+            'document_filename', 'workflow_name',
+            'created_at', 'sent_at'
+        ]
+        read_only_fields = ['id', 'sent_status', 'created_at', 'sent_at']
+        
+    def get_document_filename(self, obj):
+        return obj.document.filename if obj.document else None
+        
+    def get_workflow_name(self, obj):
+        return obj.workflow.name if obj.workflow else None
