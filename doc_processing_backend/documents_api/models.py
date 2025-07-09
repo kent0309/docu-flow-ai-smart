@@ -12,6 +12,7 @@ class Document(models.Model):
     detected_language = models.CharField(max_length=10, null=True, blank=True)
     extracted_data = models.JSONField(null=True, blank=True)
     summary = models.TextField(null=True, blank=True)
+    sentiment = models.CharField(max_length=20, null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
@@ -38,6 +39,26 @@ class WorkflowStep(models.Model):
 
     def __str__(self):
         return f"{self.workflow.name} - Step {self.step_order}: {self.name}"
+
+class Notification(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('sent', 'Sent'),
+        ('failed', 'Failed'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    recipient_email = models.EmailField()
+    subject = models.CharField(max_length=255)
+    message = models.TextField()
+    sent_status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    document = models.ForeignKey(Document, on_delete=models.CASCADE, null=True, blank=True, related_name='notifications')
+    workflow = models.ForeignKey(Workflow, on_delete=models.SET_NULL, null=True, blank=True, related_name='notifications')
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    
+    def __str__(self):
+        return f"Notification to {self.recipient_email}: {self.subject}"
 
 class ValidationRule(models.Model):
     RULE_TYPE_CHOICES = [

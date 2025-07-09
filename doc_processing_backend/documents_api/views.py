@@ -4,9 +4,11 @@ import traceback
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Document, Workflow, WorkflowStep, ValidationRule
-from .serializers import DocumentSerializer, WorkflowSerializer, WorkflowStepSerializer, ValidationRuleSerializer
+from .models import Document, Workflow, WorkflowStep, ValidationRule, Notification
+from .serializers import DocumentSerializer, WorkflowSerializer, WorkflowStepSerializer, ValidationRuleSerializer, NotificationSerializer
 from django.http import Http404
+import io
+import csv
 
 # Import the AI services
 from .services.classification_service import classify_document, detect_document_language
@@ -17,8 +19,11 @@ from .services.workflow_service import (
     process_document_in_workflow, 
     create_workflow, 
     get_workflow_templates,
-    send_workflow_notification
+    send_workflow_notification,
+    start_document_workflow,
+    send_email_notification
 )
+from .services.integration_service import send_to_external_system, get_available_integrations
 from .services.llm_service import process_document_with_llm
 from .services.validation_service import validate_document_data
 
@@ -62,6 +67,7 @@ async def process_document_pipeline(document_id):
             document.document_type = llm_results.get('document_type', 'Unknown')
             document.extracted_data = llm_results.get('extracted_data', {})
             document.summary = llm_results.get('summary', '')
+            document.sentiment = llm_results.get('sentiment', 'Neutral')
             
             # Add raw text to extracted data for reference
             if document.extracted_data is None:
@@ -213,8 +219,41 @@ class DocumentViewSet(viewsets.ModelViewSet):
         output_format = request.query_params.get('format', 'json').lower()
         
         try:
-            # Convert data to requested format
-            formatted_data = convert_to_format(document.extracted_data, output_format)
+            if output_format == 'csv':
+                # Initialize data structures
+                headers = []
+                row_data = []
+                
+                # Add main document fields
+                main_document_fields = ["filename", "uploaded_file", "status", "document_type", 
+                                       "detected_language", "summary", "uploaded_at"]
+                headers.extend(main_document_fields)
+                
+                # Get corresponding values from document object
+                for field in main_document_fields:
+                    value = getattr(document, field, "")
+                    row_data.append(str(value))
+                    
+                # Add validation status if it exists
+                if document.extracted_data and 'validation_results' in document.extracted_data:
+                    headers.append("validation_status")
+                    row_data.append(str(document.extracted_data['validation_results'].get('status', '')))
+                
+                # Flatten the extracted data fields
+                for key, value in document.extracted_data.items():
+                    if key != 'raw_text' and key != 'validation_results':
+                        headers.append(key)
+                        row_data.append(str(value))
+                
+                # Write the final CSV
+                output = io.StringIO()
+                writer = csv.writer(output)
+                writer.writerow(headers)
+                writer.writerow(row_data)
+                formatted_data = output.getvalue()
+            else:
+                # Convert data to requested format using existing function
+                formatted_data = convert_to_format(document.extracted_data, output_format)
             
             # Prepare response with appropriate content type
             content_types = {
@@ -403,6 +442,112 @@ class DocumentViewSet(viewsets.ModelViewSet):
         except Exception as e:
             print(f"Error during workflow processing: {e}")
 
+    @action(detail=True, methods=['post'])
+    def trigger_workflow(self, request, pk=None):
+        """
+        Trigger a workflow for a document.
+        This starts the automation process by calling the workflow service.
+        """
+        document = self.get_object()
+        workflow_id = request.data.get('workflow_id')
+        
+        if not workflow_id:
+            return Response(
+                {'error': 'No workflow_id provided'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Start the workflow in a background thread
+        def run_workflow():
+            asyncio.run(process_document_in_workflow(document.id, workflow_id))
+            
+        thread = threading.Thread(target=run_workflow)
+        thread.start()
+        
+        return Response({
+            'status': 'started',
+            'message': 'Workflow automation process started',
+            'document_id': str(document.id),
+            'workflow_id': workflow_id
+        })
+
+    @action(detail=True, methods=['post'])
+    def integrate_with_system(self, request, pk=None):
+        """
+        Send document data to an external system like SAP, Salesforce, etc.
+        """
+        document = self.get_object()
+        system_name = request.data.get('system_name')
+        
+        if not system_name:
+            return Response(
+                {'error': 'No system_name provided'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Ensure document is processed
+        if document.status != 'processed':
+            return Response(
+                {'error': 'Document must be fully processed before integration'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Start integration in background thread
+        def run_integration():
+            asyncio.run(self._integrate_document(document.id, system_name))
+            
+        thread = threading.Thread(target=run_integration)
+        thread.start()
+        
+        return Response({
+            'status': 'processing',
+            'message': f'Integration with {system_name} started',
+            'document_id': str(document.id),
+            'system': system_name
+        })
+        
+    async def _integrate_document(self, document_id, system_name):
+        """
+        Background task to integrate document with external system
+        """
+        try:
+            document = await Document.objects.aget(id=document_id)
+            
+            # Send to external system
+            result = await send_to_external_system(document, system_name)
+            
+            # Update document with integration result
+            if document.extracted_data:
+                if 'integrations' not in document.extracted_data:
+                    document.extracted_data['integrations'] = []
+                document.extracted_data['integrations'].append(result)
+            else:
+                document.extracted_data = {'integrations': [result]}
+                
+            await document.asave()
+            
+            # Send notification about integration status
+            await send_workflow_notification(
+                'user@example.com',  # This would be the actual user email in production
+                f"Integration with {system_name} completed",
+                f"Your document {document.filename} has been sent to {system_name} with status: {result.get('status')}",
+                document_id=document_id
+            )
+            
+        except Exception as e:
+            print(f"Error during integration with {system_name}: {e}")
+            
+    @action(detail=False, methods=['get'])
+    def available_integrations(self, request):
+        """
+        Get list of available external systems for integration
+        """
+        def get_integrations():
+            return asyncio.run(get_available_integrations())
+            
+        integrations = get_integrations()
+        return Response(integrations)
+
 class WorkflowViewSet(viewsets.ModelViewSet):
     """
     API endpoint for managing document processing workflows
@@ -494,48 +639,98 @@ class ValidationRuleViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """
-        Optionally filter validation rules by document type or active status.
+        Optionally filter by document_type.
         """
         queryset = ValidationRule.objects.all().order_by('-created_at')
-        
-        # Filter by document type if provided
         document_type = self.request.query_params.get('document_type', None)
+        field_name = self.request.query_params.get('field_name', None)
+        rule_type = self.request.query_params.get('rule_type', None)
+        
         if document_type is not None:
             queryset = queryset.filter(document_type=document_type)
-            
-        # Filter by active status if provided
-        is_active = self.request.query_params.get('is_active', None)
-        if is_active is not None:
-            is_active_bool = is_active.lower() in ['true', '1', 'yes']
-            queryset = queryset.filter(is_active=is_active_bool)
+        if field_name is not None:
+            queryset = queryset.filter(field_name=field_name)
+        if rule_type is not None:
+            queryset = queryset.filter(rule_type=rule_type)
             
         return queryset
     
     @action(detail=False, methods=['get'])
     def rule_types(self, request):
         """
-        Get available rule types for creating validation rules.
+        Get available rule types
         """
-        rule_types = [
-            {'value': choice[0], 'label': choice[1]} 
-            for choice in ValidationRule.RULE_TYPE_CHOICES
-        ]
-        return Response({'rule_types': rule_types})
+        rule_types = ValidationRule.RULE_TYPE_CHOICES
+        return Response([{'value': rt[0], 'label': rt[1]} for rt in rule_types])
     
     @action(detail=False, methods=['get'])
     def by_document_type(self, request):
         """
-        Get validation rules grouped by document type.
+        Group validation rules by document type
         """
+        # Get unique document types
         document_types = ValidationRule.objects.values_list('document_type', flat=True).distinct()
-        grouped_rules = {}
         
+        # Group rules by document type
+        result = {}
         for doc_type in document_types:
-            rules = ValidationRule.objects.filter(
-                document_type=doc_type, 
-                is_active=True
-            ).order_by('field_name')
-            serialized_rules = ValidationRuleSerializer(rules, many=True)
-            grouped_rules[doc_type] = serialized_rules.data
+            rules = ValidationRule.objects.filter(document_type=doc_type)
+            serializer = self.get_serializer(rules, many=True)
+            result[doc_type] = serializer.data
             
-        return Response(grouped_rules)
+        return Response(result)
+
+class NotificationViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing workflow notifications
+    """
+    queryset = Notification.objects.all().order_by('-created_at')
+    serializer_class = NotificationSerializer
+    
+    def get_queryset(self):
+        """
+        Optionally filter by sent_status or recipient_email
+        """
+        queryset = Notification.objects.all().order_by('-created_at')
+        sent_status = self.request.query_params.get('sent_status', None)
+        recipient = self.request.query_params.get('recipient_email', None)
+        document_id = self.request.query_params.get('document_id', None)
+        workflow_id = self.request.query_params.get('workflow_id', None)
+        
+        if sent_status is not None:
+            queryset = queryset.filter(sent_status=sent_status)
+        if recipient is not None:
+            queryset = queryset.filter(recipient_email=recipient)
+        if document_id is not None:
+            queryset = queryset.filter(document__id=document_id)
+        if workflow_id is not None:
+            queryset = queryset.filter(workflow__id=workflow_id)
+            
+        return queryset
+        
+    @action(detail=True, methods=['post'])
+    def resend(self, request, pk=None):
+        """
+        Resend a notification
+        """
+        notification = self.get_object()
+        
+        # Don't resend already sent notifications
+        if notification.sent_status == 'sent':
+            return Response(
+                {'error': 'Notification has already been sent'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Start resend in background thread
+        def run_resend():
+            asyncio.run(send_email_notification(notification))
+            
+        thread = threading.Thread(target=run_resend)
+        thread.start()
+        
+        return Response({
+            'status': 'processing',
+            'message': 'Notification resend started',
+            'notification_id': str(notification.id)
+        })
