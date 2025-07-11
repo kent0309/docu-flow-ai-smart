@@ -2,13 +2,15 @@ import asyncio
 import threading
 import traceback
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from .models import Document, Workflow, WorkflowStep, ValidationRule, Notification
 from .serializers import DocumentSerializer, WorkflowSerializer, WorkflowStepSerializer, ValidationRuleSerializer, NotificationSerializer
-from django.http import Http404
+from django.http import Http404, HttpResponse
 import io
 import csv
+import json
+import uuid
 
 # Import the AI services
 from .services.classification_service import classify_document, detect_document_language
@@ -203,74 +205,13 @@ class DocumentViewSet(viewsets.ModelViewSet):
         
         return Response(serializer.data, status=status.HTTP_201_CREATED)
         
-    @action(detail=True, methods=['get'])
-    def download_extracted_data(self, request, pk=None):
+    
+    @action(detail=True, methods=['get'], url_path='test_action')
+    def test_action(self, request, pk=None):
         """
-        Download extracted data in specified format (JSON, CSV, or XML)
+        Simple test action to verify router is working
         """
-        document = self.get_object()
-        if not document.extracted_data:
-            return Response(
-                {'error': 'No extracted data available for this document'}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        # Get requested format (default to JSON)
-        output_format = request.query_params.get('format', 'json').lower()
-        
-        try:
-            if output_format == 'csv':
-                # Initialize data structures
-                headers = []
-                row_data = []
-                
-                # Add main document fields
-                main_document_fields = ["filename", "uploaded_file", "status", "document_type", 
-                                       "detected_language", "summary", "uploaded_at"]
-                headers.extend(main_document_fields)
-                
-                # Get corresponding values from document object
-                for field in main_document_fields:
-                    value = getattr(document, field, "")
-                    row_data.append(str(value))
-                    
-                # Add validation status if it exists
-                if document.extracted_data and 'validation_results' in document.extracted_data:
-                    headers.append("validation_status")
-                    row_data.append(str(document.extracted_data['validation_results'].get('status', '')))
-                
-                # Flatten the extracted data fields
-                for key, value in document.extracted_data.items():
-                    if key != 'raw_text' and key != 'validation_results':
-                        headers.append(key)
-                        row_data.append(str(value))
-                
-                # Write the final CSV
-                output = io.StringIO()
-                writer = csv.writer(output)
-                writer.writerow(headers)
-                writer.writerow(row_data)
-                formatted_data = output.getvalue()
-            else:
-                # Convert data to requested format using existing function
-                formatted_data = convert_to_format(document.extracted_data, output_format)
-            
-            # Prepare response with appropriate content type
-            content_types = {
-                'json': 'application/json',
-                'csv': 'text/csv',
-                'xml': 'application/xml'
-            }
-            
-            return Response(
-                formatted_data, 
-                content_type=content_types.get(output_format, 'text/plain'),
-                headers={
-                    'Content-Disposition': f'attachment; filename="{document.filename}_data.{output_format}"'
-                }
-            )
-        except ValueError as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'message': f'Test action working for document {pk}'})
     
     @action(detail=True, methods=['get'])
     def semantic_analysis(self, request, pk=None):
@@ -734,3 +675,199 @@ class NotificationViewSet(viewsets.ModelViewSet):
             'message': 'Notification resend started',
             'notification_id': str(notification.id)
         })
+        
+# Test endpoint for debugging URL routing
+@api_view(['GET'])
+def test_endpoint(request):
+    """Simple test endpoint to verify URL routing works"""
+    format_param = request.query_params.get('format', 'none')
+    return Response({
+        'message': 'Test endpoint working',
+        'format': format_param,
+        'query_params': dict(request.query_params)
+    })
+
+# Dedicated CSV download endpoint
+@api_view(['GET'])
+def download_document_csv(request, pk):
+    """Direct CSV download endpoint"""
+    print(f"DEBUG: CSV endpoint called with pk={pk}")
+    try:
+        document = Document.objects.get(id=pk)
+        
+        if not document.extracted_data:
+            return Response(
+                {'error': 'No extracted data available for this document'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Generate CSV
+        import io
+        import csv
+        
+        headers = []
+        row_data = []
+        
+        # Add main document fields
+        main_document_fields = ["filename", "status", "document_type", "detected_language", "uploaded_at", "summary"]
+        for field in main_document_fields:
+            headers.append(field)
+            value = getattr(document, field, "")
+            row_data.append(str(value))
+            
+        # Add validation status if it exists
+        if document.extracted_data and 'validation_results' in document.extracted_data:
+            headers.append("validation_status")
+            row_data.append(str(document.extracted_data['validation_results'].get('status', '')))
+        
+        # Add extracted data fields - prioritize important fields first
+        priority_fields = ['form_identifier', 'involved_party_1', 'involved_party_2_role', 'fields_identified']
+        
+        # Add priority fields first
+        for key in priority_fields:
+            if key in document.extracted_data:
+                headers.append(key)
+                row_data.append(str(document.extracted_data[key]))
+        
+        # Add any remaining extracted data fields
+        for key, value in document.extracted_data.items():
+            if key not in ['raw_text', 'validation_results'] + priority_fields:
+                headers.append(key)
+                row_data.append(str(value))
+        
+        # Write the final CSV
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(headers)
+        writer.writerow(row_data)
+        csv_content = output.getvalue()
+        
+        # Create a direct HttpResponse with CSV content
+        response = HttpResponse(
+            content=csv_content,
+            content_type='text/csv'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{document.filename}_data.csv"'
+        return response
+        
+    except Document.DoesNotExist:
+        return Response(
+            {'error': f'Document with ID {pk} not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        print(f"Error in CSV download: {str(e)}")
+        return Response(
+            {'error': f'Error processing request: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+# Direct view function for document data download to handle query parameters properly
+@api_view(['GET'])
+def download_document_data(request, pk, format=None):
+    """
+    Direct view function for downloading extracted data in specified format (JSON, CSV, or XML)
+    """
+    print(f"DEBUG: download_document_data called with pk={pk}")
+    print(f"DEBUG: query_params={dict(request.query_params)}")
+    print(f"DEBUG: method={request.method}")
+    try:
+        # Try to get the document by ID
+        try:
+            document = Document.objects.get(id=pk)
+        except Document.DoesNotExist:
+            return Response(
+                {'error': f'Document with ID {pk} not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+            
+        if not document.extracted_data:
+            return Response(
+                {'error': 'No extracted data available for this document'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get requested format from URL parameter or query parameters (default to JSON)
+        output_format = format or request.query_params.get('format', 'json')
+        output_format = output_format.lower()
+        
+        # Validate format
+        valid_formats = ['json', 'csv', 'xml']
+        if output_format not in valid_formats:
+            return Response(
+                {'error': f'Invalid format. Supported formats: {", ".join(valid_formats)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            if output_format == 'csv':
+                # Initialize data structures
+                headers = []
+                row_data = []
+                
+                # Add main document fields
+                main_document_fields = ["filename", "uploaded_file", "status", "document_type", 
+                                       "detected_language", "summary", "uploaded_at"]
+                headers.extend(main_document_fields)
+                
+                # Get corresponding values from document object
+                for field in main_document_fields:
+                    value = getattr(document, field, "")
+                    row_data.append(str(value))
+                    
+                # Add validation status if it exists
+                if document.extracted_data and 'validation_results' in document.extracted_data:
+                    headers.append("validation_status")
+                    row_data.append(str(document.extracted_data['validation_results'].get('status', '')))
+                
+                # Flatten the extracted data fields
+                for key, value in document.extracted_data.items():
+                    if key != 'raw_text' and key != 'validation_results':
+                        headers.append(key)
+                        row_data.append(str(value))
+                
+                # Write the final CSV
+                output = io.StringIO()
+                writer = csv.writer(output)
+                writer.writerow(headers)
+                writer.writerow(row_data)
+                formatted_data = output.getvalue()
+                
+                # Create a direct HttpResponse with CSV content
+                response = HttpResponse(
+                    content=formatted_data,
+                    content_type='text/csv'
+                )
+                response['Content-Disposition'] = f'attachment; filename="{document.filename}_data.csv"'
+                return response
+                
+            elif output_format == 'json':
+                # Return JSON directly
+                formatted_data = json.dumps(document.extracted_data, indent=2)
+                response = HttpResponse(
+                    content=formatted_data,
+                    content_type='application/json'
+                )
+                response['Content-Disposition'] = f'attachment; filename="{document.filename}_data.json"'
+                return response
+                
+            else:
+                # Convert data to XML using existing function
+                formatted_data = convert_to_format(document.extracted_data, output_format)
+                response = HttpResponse(
+                    content=formatted_data,
+                    content_type='application/xml'
+                )
+                response['Content-Disposition'] = f'attachment; filename="{document.filename}_data.xml"'
+                return response
+                
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            
+    except Exception as e:
+        print(f"Error in download_document_data: {str(e)}")
+        traceback.print_exc()
+        return Response(
+            {'error': f'Error processing request: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
