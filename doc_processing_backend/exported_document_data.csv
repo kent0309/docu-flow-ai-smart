@@ -1,0 +1,2 @@
+filename,status,document_type,detected_language,uploaded_at,validation_status,form_identifier,involved_party_1,involved_party_2_role,fields_identified
+0000126164.jpg,processed,Form,English,2025-07-10 09:01:57.698684+00:00,failed,POM coupon,UANNCERICKSON,VP. Brand Management,"['signature', 'date']"
