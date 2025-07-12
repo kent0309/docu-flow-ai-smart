@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
 import DocumentGrid from '@/components/documents/DocumentGrid';
 import DocumentDetailView from '@/components/documents/DocumentDetailView';
@@ -18,10 +19,15 @@ import { Link } from 'react-router-dom';
 import { fetchDocuments } from '@/lib/api';
 
 const Documents = () => {
+  const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
   const [isDetailViewOpen, setIsDetailViewOpen] = useState(false);
+  
+  // Get filters from URL parameters
+  const statusFilter = searchParams.get('status');
+  const typeFilter = searchParams.get('type');
   
   // Fetch documents from API using React Query
   const { data = [], isLoading, isError } = useQuery({
@@ -120,10 +126,21 @@ const Documents = () => {
   // Filter and sort live data with useMemo for performance
   const filteredDocuments = useMemo(() => {
     return data
-      .filter(doc => 
-        doc.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.type.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      .filter(doc => {
+        // Search filter
+        const matchesSearch = doc.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          doc.type.toLowerCase().includes(searchQuery.toLowerCase());
+        
+        // Status filter from URL
+        const matchesStatus = !statusFilter || doc.status === statusFilter;
+        
+        // Type filter from URL
+        const matchesType = !typeFilter || typeFilter === 'All' || 
+          doc.document_type?.toLowerCase() === typeFilter.toLowerCase() ||
+          doc.type?.toLowerCase() === typeFilter.toLowerCase();
+          
+        return matchesSearch && matchesStatus && matchesType;
+      })
       .sort((a, b) => {
         const dateA = new Date(a.date);
         const dateB = new Date(b.date);
@@ -131,16 +148,29 @@ const Documents = () => {
           ? dateA.getTime() - dateB.getTime() 
           : dateB.getTime() - dateA.getTime();
       });
-  }, [data, searchQuery, sortOrder]);
+  }, [data, searchQuery, sortOrder, statusFilter, typeFilter]);
+
+  // Get current filter display text
+  const getFilterDisplayText = () => {
+    const filters = [];
+    if (statusFilter) filters.push(`Status: ${statusFilter}`);
+    if (typeFilter) filters.push(`Type: ${typeFilter}`);
+    return filters.length > 0 ? ` (${filters.join(', ')})` : '';
+  };
 
   return (
     <MainLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Documents</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Documents{getFilterDisplayText()}
+            </h1>
             <p className="text-muted-foreground">
               View and manage your processed documents
+              {filteredDocuments.length !== data.length && (
+                <span className="ml-1">({filteredDocuments.length} of {data.length} shown)</span>
+              )}
             </p>
           </div>
           <Link to="/upload">

@@ -4,8 +4,29 @@ import traceback
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
-from .models import Document, Workflow, WorkflowStep, ValidationRule, Notification
-from .serializers import DocumentSerializer, WorkflowSerializer, WorkflowStepSerializer, ValidationRuleSerializer, NotificationSerializer
+from rest_framework.permissions import IsAuthenticated
+from django.contrib.auth.models import User
+from django.db.models import Q
+from django.utils import timezone
+from datetime import datetime, timedelta
+
+# Import models
+from .models import (
+    Document, Workflow, WorkflowStep, ValidationRule, Notification,
+    IntegrationConfiguration, IntegrationAuditLog, DocumentApproval,
+    WorkflowExecution, RealTimeSyncStatus
+)
+
+# Import serializers
+from .serializers import (
+    DocumentSerializer, WorkflowSerializer, WorkflowStepSerializer, 
+    ValidationRuleSerializer, NotificationSerializer, UserSerializer,
+    IntegrationConfigurationSerializer, IntegrationAuditLogSerializer,
+    DocumentApprovalSerializer, WorkflowExecutionSerializer,
+    RealTimeSyncStatusSerializer, DocumentWithApprovalsSerializer,
+    WorkflowWithExecutionsSerializer
+)
+
 from django.http import Http404, HttpResponse
 import io
 import csv
@@ -23,11 +44,19 @@ from .services.workflow_service import (
     get_workflow_templates,
     send_workflow_notification,
     start_document_workflow,
-    send_email_notification
+    send_email_notification,
+    workflow_service
 )
-from .services.integration_service import send_to_external_system, get_available_integrations
+from .services.integration_service import (
+    send_to_external_system, 
+    get_available_integrations,
+    integration_service,
+    sync_service
+)
 from .services.llm_service import process_document_with_llm
 from .services.validation_service import validate_document_data
+from .services.pattern_analysis_service import analyze_document_patterns, auto_create_validation_rules
+from asgiref.sync import sync_to_async
 
 def run_pipeline_in_background(document_id):
     """
@@ -155,6 +184,15 @@ async def process_document_pipeline(document_id):
         await document.asave()
         print(f"Successfully processed and saved document: {document.filename}, type: {document.document_type}")
 
+        # --- AUTOMATIC PATTERN ANALYSIS ---
+        # Automatically learn from each document to improve validation rules
+        try:
+            print(f"🔍 Starting automatic pattern analysis for {document.document_type} document...")
+            await auto_pattern_analysis(document.document_type, document.id)
+        except Exception as e:
+            print(f"⚠️ Automatic pattern analysis failed (non-critical): {str(e)}")
+            # Don't fail the pipeline if pattern analysis fails
+
     except Document.DoesNotExist:
         print(f"Error in pipeline: Document with id {document_id} not found.")
     except Exception as e:
@@ -167,6 +205,77 @@ async def process_document_pipeline(document_id):
             await document_to_fail.asave()
         except Document.DoesNotExist:
             pass
+
+async def auto_pattern_analysis(document_type: str, current_document_id: int):
+    """
+    Automatically analyze patterns and create validation rules after document processing.
+    This makes the system intelligent by learning from each document.
+    """
+    try:
+        # Count total documents of this type
+        @sync_to_async
+        def count_documents():
+            return Document.objects.filter(
+                document_type=document_type,
+                status='processed'
+            ).count()
+        
+        @sync_to_async
+        def count_existing_rules():
+            return ValidationRule.objects.filter(
+                document_type=document_type,
+                is_active=True
+            ).count()
+        
+        doc_count = await count_documents()
+        existing_rules = await count_existing_rules()
+        
+        print(f"📊 Found {doc_count} processed {document_type} documents, {existing_rules} existing rules")
+        
+        # Smart triggers for pattern analysis
+        should_analyze = False
+        analysis_reason = ""
+        
+        if existing_rules == 0 and doc_count >= 1:
+            # First document of this type - analyze immediately
+            should_analyze = True
+            analysis_reason = "First document of this type"
+        elif doc_count in [3, 5, 10, 20, 50]:
+            # Key milestones - analyze to improve rules
+            should_analyze = True
+            analysis_reason = f"Milestone reached: {doc_count} documents"
+        elif doc_count % 25 == 0:
+            # Every 25 documents - continuous learning
+            should_analyze = True
+            analysis_reason = f"Continuous learning: {doc_count} documents"
+        
+        if should_analyze:
+            print(f"🎯 Triggering pattern analysis: {analysis_reason}")
+            
+            # Run pattern analysis with smart parameters
+            min_samples = max(1, min(doc_count, 5))  # At least 1, max 5
+            analysis_results = await analyze_document_patterns(document_type, min_samples)
+            
+            if analysis_results and analysis_results.get('patterns'):
+                print(f"✅ Pattern analysis completed: {len(analysis_results['patterns'])} patterns found")
+                
+                # Auto-create rules with confidence threshold
+                confidence_threshold = 0.7 if doc_count < 5 else 0.8  # Lower threshold for early learning
+                creation_results = await auto_create_validation_rules(document_type, confidence_threshold)
+                
+                if creation_results and creation_results.get('created_rules'):
+                    created_count = len(creation_results['created_rules'])
+                    print(f"🚀 Auto-created {created_count} validation rules for {document_type}")
+                else:
+                    print(f"📝 No new rules created (confidence threshold: {confidence_threshold})")
+            else:
+                print(f"📊 Pattern analysis completed but no clear patterns found yet")
+        else:
+            print(f"⏳ Pattern analysis skipped (will analyze at next milestone)")
+            
+    except Exception as e:
+        print(f"❌ Error in automatic pattern analysis: {str(e)}")
+        # Don't propagate error - this should not fail document processing
 
 class DocumentViewSet(viewsets.ModelViewSet):
     """
@@ -620,6 +729,132 @@ class ValidationRuleViewSet(viewsets.ModelViewSet):
             result[doc_type] = serializer.data
             
         return Response(result)
+    
+    @action(detail=False, methods=['post'])
+    def analyze_patterns(self, request):
+        """
+        Analyze document patterns and suggest validation rules
+        """
+        document_type = request.data.get('document_type')
+        min_samples = request.data.get('min_samples', 5)
+        
+        if not document_type:
+            return Response(
+                {'error': 'document_type is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Run pattern analysis in background thread since this is not an async view
+            def run_analysis():
+                return asyncio.run(analyze_document_patterns(document_type, min_samples))
+            
+            analysis_results = run_analysis()
+            
+            return Response({
+                'status': 'completed',
+                'message': 'Pattern analysis completed',
+                'results': analysis_results
+            })
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Pattern analysis failed: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['post'])
+    def auto_create_rules(self, request):
+        """
+        Automatically create validation rules based on document patterns
+        """
+        document_type = request.data.get('document_type')
+        confidence_threshold = request.data.get('confidence_threshold', 0.9)
+        
+        if not document_type:
+            return Response(
+                {'error': 'document_type is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Run auto-creation in background thread since this is not an async view
+            def run_auto_creation():
+                return asyncio.run(auto_create_validation_rules(document_type, confidence_threshold))
+            
+            creation_results = run_auto_creation()
+            
+            return Response({
+                'status': 'completed',
+                'message': 'Auto-creation of validation rules completed',
+                'results': creation_results
+            })
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Auto-creation failed: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['post'])
+    def test_cross_reference(self, request):
+        """
+        Test cross-reference validation without creating a rule
+        """
+        field_name = request.data.get('field_name')
+        reference_field = request.data.get('reference_field')
+        calculation_type = request.data.get('calculation_type', 'sum')
+        tolerance = request.data.get('tolerance', 0.01)
+        sample_data = request.data.get('sample_data', {})
+        
+        if not all([field_name, reference_field, sample_data]):
+            return Response(
+                {'error': 'field_name, reference_field, and sample_data are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            from .services.validation_service import ValidationEngine
+            
+            # Create a temporary validation rule for testing
+            class TempRule:
+                def __init__(self):
+                    self.name = 'temp_cross_reference_test'
+                    self.field_name = field_name
+                    self.reference_field = reference_field
+                    self.calculation_type = calculation_type
+                    self.tolerance = tolerance
+            
+            temp_rule = TempRule()
+            
+            # Test the cross-reference validation
+            engine = ValidationEngine()
+            engine.current_extracted_data = sample_data
+            
+            field_value = engine._get_field_value(sample_data, field_name)
+            is_valid, error_message = engine._validate_cross_reference(field_value, '', temp_rule)
+            
+            return Response({
+                'status': 'completed',
+                'message': 'Cross-reference validation test completed',
+                'results': {
+                    'is_valid': is_valid,
+                    'error_message': error_message,
+                    'field_value': field_value,
+                    'test_parameters': {
+                        'field_name': field_name,
+                        'reference_field': reference_field,
+                        'calculation_type': calculation_type,
+                        'tolerance': tolerance
+                    }
+                }
+            })
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Cross-reference validation test failed: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class NotificationViewSet(viewsets.ModelViewSet):
     """
@@ -695,12 +930,6 @@ def download_document_csv(request, pk):
     try:
         document = Document.objects.get(id=pk)
         
-        if not document.extracted_data:
-            return Response(
-                {'error': 'No extracted data available for this document'}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
         # Generate CSV
         import io
         import csv
@@ -708,32 +937,38 @@ def download_document_csv(request, pk):
         headers = []
         row_data = []
         
-        # Add main document fields
+        # Add main document fields (always available)
         main_document_fields = ["filename", "status", "document_type", "detected_language", "uploaded_at", "summary"]
         for field in main_document_fields:
             headers.append(field)
             value = getattr(document, field, "")
             row_data.append(str(value))
+        
+        # Add extracted data if available
+        if document.extracted_data:
+            # Add validation status if it exists
+            if 'validation_results' in document.extracted_data:
+                headers.append("validation_status")
+                row_data.append(str(document.extracted_data['validation_results'].get('status', '')))
             
-        # Add validation status if it exists
-        if document.extracted_data and 'validation_results' in document.extracted_data:
-            headers.append("validation_status")
-            row_data.append(str(document.extracted_data['validation_results'].get('status', '')))
-        
-        # Add extracted data fields - prioritize important fields first
-        priority_fields = ['form_identifier', 'involved_party_1', 'involved_party_2_role', 'fields_identified']
-        
-        # Add priority fields first
-        for key in priority_fields:
-            if key in document.extracted_data:
-                headers.append(key)
-                row_data.append(str(document.extracted_data[key]))
-        
-        # Add any remaining extracted data fields
-        for key, value in document.extracted_data.items():
-            if key not in ['raw_text', 'validation_results'] + priority_fields:
-                headers.append(key)
-                row_data.append(str(value))
+            # Add extracted data fields - prioritize important fields first
+            priority_fields = ['form_identifier', 'involved_party_1', 'involved_party_2_role', 'fields_identified']
+            
+            # Add priority fields first
+            for key in priority_fields:
+                if key in document.extracted_data:
+                    headers.append(key)
+                    row_data.append(str(document.extracted_data[key]))
+            
+            # Add any remaining extracted data fields
+            for key, value in document.extracted_data.items():
+                if key not in ['raw_text', 'validation_results'] + priority_fields:
+                    headers.append(key)
+                    row_data.append(str(value))
+        else:
+            # Add note that no data was extracted
+            headers.append("extraction_note")
+            row_data.append("No data extracted - document processing may have failed")
         
         # Write the final CSV
         output = io.StringIO()
@@ -871,3 +1106,321 @@ def download_document_data(request, pk, format=None):
             {'error': f'Error processing request: {str(e)}'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+class IntegrationConfigurationViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing integration configurations.
+    """
+    queryset = IntegrationConfiguration.objects.all().order_by('-created_at')
+    serializer_class = IntegrationConfigurationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        """Set the created_by field when creating a new integration."""
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def test_connection(self, request, pk=None):
+        """Test connection to external system."""
+        integration = self.get_object()
+        
+        def run_test():
+            asyncio.run(self._test_integration_connection(integration.id))
+
+        thread = threading.Thread(target=run_test)
+        thread.daemon = True
+        thread.start()
+
+        return Response({'message': 'Connection test started'})
+
+    async def _test_integration_connection(self, integration_id):
+        """Test integration connection."""
+        try:
+            integration = await IntegrationConfiguration.objects.aget(id=integration_id)
+            
+            # Create a test document for connection testing
+            test_document = type('TestDocument', (), {
+                'id': 'test',
+                'filename': 'test.pdf',
+                'document_type': 'test',
+                'extracted_data': {'test': 'data'},
+                'summary': 'Test document for connection testing',
+                'detected_language': 'en',
+                'sentiment': 'neutral'
+            })()
+            
+            # Test the connection
+            result = await integration_service.send_to_external_system(test_document, integration)
+            
+            # Update integration status
+            if result.get('status') == 'success':
+                integration.status = 'active'
+            else:
+                integration.status = 'error'
+            
+            await integration.asave()
+            print(f"Connection test result: {result}")
+            
+        except Exception as e:
+            print(f"Error testing connection: {str(e)}")
+
+    @action(detail=False, methods=['get'])
+    def by_type(self, request):
+        """Get integrations by type."""
+        integration_type = request.query_params.get('type')
+        if integration_type:
+            integrations = self.queryset.filter(integration_type=integration_type)
+        else:
+            integrations = self.queryset.all()
+        
+        serializer = self.get_serializer(integrations, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def audit_logs(self, request, pk=None):
+        """Get audit logs for this integration."""
+        integration = self.get_object()
+        logs = IntegrationAuditLog.objects.filter(integration=integration).order_by('-started_at')
+        serializer = IntegrationAuditLogSerializer(logs, many=True)
+        return Response(serializer.data)
+
+
+class IntegrationAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API endpoint for viewing integration audit logs.
+    """
+    queryset = IntegrationAuditLog.objects.all().order_by('-started_at')
+    serializer_class = IntegrationAuditLogSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Filter logs by integration or document if specified."""
+        queryset = super().get_queryset()
+        integration_id = self.request.query_params.get('integration_id')
+        document_id = self.request.query_params.get('document_id')
+        
+        if integration_id:
+            queryset = queryset.filter(integration_id=integration_id)
+        if document_id:
+            queryset = queryset.filter(document_id=document_id)
+            
+        return queryset
+
+
+class DocumentApprovalViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing document approvals.
+    """
+    queryset = DocumentApproval.objects.all().order_by('-assigned_at')
+    serializer_class = DocumentApprovalSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Filter approvals by user or status."""
+        queryset = super().get_queryset()
+        
+        # Filter by current user's approvals
+        if self.request.query_params.get('my_approvals'):
+            queryset = queryset.filter(approver=self.request.user)
+        
+        # Filter by status
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+            
+        return queryset
+
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        """Approve a document."""
+        approval = self.get_object()
+        comments = request.data.get('comments', '')
+        
+        def run_approval():
+            asyncio.run(self._handle_approval(pk, 'approved', comments))
+
+        thread = threading.Thread(target=run_approval)
+        thread.daemon = True
+        thread.start()
+
+        return Response({'message': 'Approval processed'})
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        """Reject a document."""
+        approval = self.get_object()
+        comments = request.data.get('comments', '')
+        
+        def run_rejection():
+            asyncio.run(self._handle_approval(pk, 'rejected', comments))
+
+        thread = threading.Thread(target=run_rejection)
+        thread.daemon = True
+        thread.start()
+
+        return Response({'message': 'Rejection processed'})
+
+    @action(detail=True, methods=['post'])
+    def delegate(self, request, pk=None):
+        """Delegate an approval to another user."""
+        delegated_to_id = request.data.get('delegated_to_id')
+        delegation_reason = request.data.get('delegation_reason', '')
+        
+        if not delegated_to_id:
+            return Response({'error': 'delegated_to_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        def run_delegation():
+            asyncio.run(self._handle_delegation(pk, delegated_to_id, delegation_reason))
+
+        thread = threading.Thread(target=run_delegation)
+        thread.daemon = True
+        thread.start()
+
+        return Response({'message': 'Delegation processed'})
+
+    async def _handle_approval(self, approval_id, action, comments):
+        """Handle approval action."""
+        try:
+            result = await workflow_service.handle_approval_response(
+                approval_id, 
+                self.request.user, 
+                action, 
+                comments
+            )
+            print(f"Approval result: {result}")
+        except Exception as e:
+            print(f"Error handling approval: {str(e)}")
+
+    async def _handle_delegation(self, approval_id, delegated_to_id, delegation_reason):
+        """Handle approval delegation."""
+        try:
+            approval = await DocumentApproval.objects.aget(id=approval_id)
+            delegated_to = await User.objects.aget(id=delegated_to_id)
+            
+            approval.delegated_to = delegated_to
+            approval.delegation_reason = delegation_reason
+            approval.status = 'delegated'
+            await approval.asave()
+            
+            # Create new approval for delegated user
+            new_approval = DocumentApproval(
+                document=approval.document,
+                workflow_step=approval.workflow_step,
+                approver=delegated_to,
+                approval_level=approval.approval_level,
+                due_date=approval.due_date
+            )
+            await new_approval.asave()
+            
+            print(f"Approval delegated to {delegated_to.username}")
+            
+        except Exception as e:
+            print(f"Error handling delegation: {str(e)}")
+
+
+class WorkflowExecutionViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API endpoint for viewing workflow executions.
+    """
+    queryset = WorkflowExecution.objects.all().order_by('-started_at')
+    serializer_class = WorkflowExecutionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Filter executions by document or workflow."""
+        queryset = super().get_queryset()
+        document_id = self.request.query_params.get('document_id')
+        workflow_id = self.request.query_params.get('workflow_id')
+        
+        if document_id:
+            queryset = queryset.filter(document_id=document_id)
+        if workflow_id:
+            queryset = queryset.filter(workflow_id=workflow_id)
+            
+        return queryset
+
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        """Cancel a workflow execution."""
+        execution = self.get_object()
+        
+        if execution.status in ['completed', 'failed', 'cancelled']:
+            return Response({'error': 'Cannot cancel completed workflow'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        execution.status = 'cancelled'
+        execution.completed_at = timezone.now()
+        execution.save()
+        
+        return Response({'message': 'Workflow cancelled'})
+
+
+class RealTimeSyncStatusViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing real-time sync status.
+    """
+    queryset = RealTimeSyncStatus.objects.all().order_by('-last_sync')
+    serializer_class = RealTimeSyncStatusSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Filter sync status by document or integration."""
+        queryset = super().get_queryset()
+        document_id = self.request.query_params.get('document_id')
+        integration_id = self.request.query_params.get('integration_id')
+        
+        if document_id:
+            queryset = queryset.filter(document_id=document_id)
+        if integration_id:
+            queryset = queryset.filter(integration_id=integration_id)
+            
+        return queryset
+
+    @action(detail=True, methods=['post'])
+    def force_sync(self, request, pk=None):
+        """Force sync for a document."""
+        sync_status = self.get_object()
+        
+        def run_sync():
+            asyncio.run(self._force_sync(sync_status.id))
+
+        thread = threading.Thread(target=run_sync)
+        thread.daemon = True
+        thread.start()
+
+        return Response({'message': 'Sync forced'})
+
+    async def _force_sync(self, sync_status_id):
+        """Force sync for a document."""
+        try:
+            sync_status = await RealTimeSyncStatus.objects.aget(id=sync_status_id)
+            
+            # Perform sync
+            result = await integration_service.send_to_external_system(
+                sync_status.document,
+                sync_status.integration
+            )
+            
+            # Update sync status
+            sync_status.external_data = result
+            sync_status.is_synced = result.get('status') == 'success'
+            sync_status.retry_count = 0 if sync_status.is_synced else sync_status.retry_count + 1
+            await sync_status.asave()
+            
+            print(f"Force sync result: {result}")
+            
+        except Exception as e:
+            print(f"Error in force sync: {str(e)}")
+
+    @action(detail=True, methods=['post'])
+    def stop_sync(self, request, pk=None):
+        """Stop real-time sync for a document."""
+        sync_status = self.get_object()
+        
+        def run_stop():
+            asyncio.run(sync_service.stop_sync(sync_status.document.id, sync_status.integration.id))
+
+        thread = threading.Thread(target=run_stop)
+        thread.daemon = True
+        thread.start()
+
+        return Response({'message': 'Sync stopped'})

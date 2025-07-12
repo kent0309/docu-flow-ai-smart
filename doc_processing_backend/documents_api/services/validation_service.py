@@ -16,6 +16,8 @@ class ValidationEngine:
             'required': self._validate_required,
             'range': self._validate_range,
             'enum': self._validate_enum,
+            'cross_reference': self._validate_cross_reference,
+            'calculation': self._validate_calculation,
         }
     
     async def validate_document_data(self, extracted_data: Dict[str, Any], document_type: str) -> Dict[str, Any]:
@@ -93,6 +95,9 @@ class ValidationEngine:
             'errors': [],
             'value': None
         }
+        
+        # Store extracted data for cross-reference validation
+        self.current_extracted_data = extracted_data
         
         # Get the field value from extracted data
         field_value = self._get_field_value(extracted_data, rule.field_name)
@@ -238,6 +243,120 @@ class ValidationEngine:
             return True, ""
         else:
             return False, f"Field '{rule.field_name}' value '{str_value}' is not in allowed values: {', '.join(allowed_list)}"
+    
+    def _validate_cross_reference(self, value: Any, pattern: str, rule: ValidationRule) -> Tuple[bool, str]:
+        """Validates value against a cross-reference calculation (e.g., total vs sum of line items)."""
+        if value is None:
+            return False, f"Field '{rule.field_name}' is missing but required for cross-reference validation"
+        
+        if not rule.reference_field:
+            return False, f"Cross-reference validation requires a reference_field in rule '{rule.name}'"
+        
+        # Get the reference field value (e.g., line items)
+        reference_value = self._get_field_value(self.current_extracted_data, rule.reference_field)
+        
+        if reference_value is None:
+            return False, f"Reference field '{rule.reference_field}' is missing for cross-reference validation"
+        
+        # Determine calculation type (default to sum)
+        calc_type = rule.calculation_type or 'sum'
+        
+        try:
+            # Calculate the reference value based on calculation type
+            calculated_value = self._calculate_reference_value(reference_value, calc_type, rule)
+            
+            # Convert main value to float for comparison
+            main_value = self._extract_numeric_value(value)
+            
+            # Compare values with tolerance
+            tolerance = float(rule.tolerance) if rule.tolerance else 0.01
+            difference = abs(main_value - calculated_value)
+            
+            if difference <= tolerance:
+                return True, ""
+            else:
+                return False, f"Field '{rule.field_name}' value {main_value} does not match calculated {calc_type} {calculated_value} from '{rule.reference_field}' (difference: {difference}, tolerance: {tolerance})"
+                
+        except Exception as e:
+            return False, f"Error in cross-reference validation for rule '{rule.name}': {str(e)}"
+    
+    def _validate_calculation(self, value: Any, pattern: str, rule: ValidationRule) -> Tuple[bool, str]:
+        """Validates value against a calculation rule (similar to cross-reference but more flexible)."""
+        if value is None:
+            return False, f"Field '{rule.field_name}' is missing but required for calculation validation"
+        
+        if not rule.reference_field:
+            return False, f"Calculation validation requires a reference_field in rule '{rule.name}'"
+        
+        # This is similar to cross-reference but allows more complex patterns
+        # For now, we'll delegate to cross-reference validation
+        return self._validate_cross_reference(value, pattern, rule)
+    
+    # Helper methods for cross-reference validation
+    def _calculate_reference_value(self, reference_data: Any, calc_type: str, rule: ValidationRule) -> float:
+        """Calculate the reference value based on the calculation type."""
+        if not isinstance(reference_data, list):
+            # If it's not a list, try to extract a single numeric value
+            return self._extract_numeric_value(reference_data)
+        
+        # Extract numeric values from the list
+        numeric_values = []
+        for item in reference_data:
+            if isinstance(item, dict):
+                # Look for common amount/total fields in line items
+                for field_name in ['amount', 'total', 'price', 'value', 'cost']:
+                    if field_name in item:
+                        numeric_values.append(self._extract_numeric_value(item[field_name]))
+                        break
+                else:
+                    # If no standard fields found, look for any numeric value
+                    for key, val in item.items():
+                        try:
+                            numeric_values.append(self._extract_numeric_value(val))
+                            break
+                        except:
+                            continue
+            else:
+                # Direct numeric value
+                try:
+                    numeric_values.append(self._extract_numeric_value(item))
+                except:
+                    continue
+        
+        if not numeric_values:
+            raise ValueError(f"No numeric values found in reference field '{rule.reference_field}'")
+        
+        # Perform calculation based on type
+        if calc_type == 'sum':
+            return sum(numeric_values)
+        elif calc_type == 'average':
+            return sum(numeric_values) / len(numeric_values)
+        elif calc_type == 'count':
+            return len(numeric_values)
+        elif calc_type == 'min':
+            return min(numeric_values)
+        elif calc_type == 'max':
+            return max(numeric_values)
+        else:
+            raise ValueError(f"Unknown calculation type: {calc_type}")
+    
+    def _extract_numeric_value(self, value: Any) -> float:
+        """Extract numeric value from various formats."""
+        if isinstance(value, (int, float)):
+            return float(value)
+        
+        if isinstance(value, str):
+            # Remove currency symbols and formatting
+            cleaned = re.sub(r'[$€£¥₹,\s]', '', value.strip())
+            try:
+                return float(cleaned)
+            except ValueError:
+                raise ValueError(f"Cannot convert '{value}' to numeric value")
+        
+        if isinstance(value, dict) and 'value' in value:
+            return self._extract_numeric_value(value['value'])
+        
+        raise ValueError(f"Cannot extract numeric value from {type(value)}: {value}")
     
     # Helper methods for data type validation
     def _is_valid_float(self, value: Any) -> bool:
