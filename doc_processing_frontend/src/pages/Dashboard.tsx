@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
 import StatCard from '@/components/dashboard/StatCard';
 import ProcessingStats from '@/components/dashboard/ProcessingStats';
@@ -19,35 +20,62 @@ import { Link } from 'react-router-dom';
 import { fetchDocuments, type Document } from '@/lib/api';
 
 const Dashboard = () => {
+  const [searchParams] = useSearchParams();
+  
   // Fetch documents from API using React Query with same queryKey for caching
+  // This reuses the same query as MainLayout, so it will be cached
   const { data: documents = [], isLoading, isError } = useQuery({
     queryKey: ['documents'],
     queryFn: fetchDocuments,
   });
 
-  // Calculate statistics dynamically from fetched data
+  // Get filters from URL parameters
+  const typeFilter = searchParams.get('type');
+
+  // Apply type filter to documents if present
+  const filteredDocuments = useMemo(() => {
+    if (!typeFilter || typeFilter === 'All') {
+      return documents;
+    }
+    return documents.filter(doc => 
+      doc.document_type?.toLowerCase() === typeFilter.toLowerCase() ||
+      doc.type?.toLowerCase() === typeFilter.toLowerCase()
+    );
+  }, [documents, typeFilter]);
+
+  // Calculate statistics dynamically from filtered data
   const stats = useMemo(() => {
     return {
-      total: documents.length,
-      processing: documents.filter(doc => doc.status === 'processing').length,
-      processed: documents.filter(doc => doc.status === 'processed').length,
-      errors: documents.filter(doc => doc.status === 'error').length,
+      total: filteredDocuments.length,
+      processing: filteredDocuments.filter(doc => doc.status === 'processing').length,
+      processed: filteredDocuments.filter(doc => doc.status === 'processed').length,
+      errors: filteredDocuments.filter(doc => doc.status === 'error').length,
     };
-  }, [documents]);
+  }, [filteredDocuments]);
 
-  // Get recent documents (latest 4)
+  // Get recent documents (latest 4) from filtered set
   const recentDocuments = useMemo(() => {
-    return documents.slice(0, 4);
-  }, [documents]);
+    return filteredDocuments.slice(0, 4);
+  }, [filteredDocuments]);
+
+  // Get filter display text
+  const getFilterDisplayText = () => {
+    return typeFilter ? ` - ${typeFilter}` : '';
+  };
 
   return (
     <MainLayout>
       <div className="space-y-8">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Dashboard{getFilterDisplayText()}
+            </h1>
             <p className="text-muted-foreground">
               View and manage your document processing activities
+              {typeFilter && (
+                <span className="ml-1">({filteredDocuments.length} {typeFilter.toLowerCase()} documents)</span>
+              )}
             </p>
           </div>
           <Link to="/upload">
@@ -72,7 +100,7 @@ const Dashboard = () => {
                 title="Total Documents"
                 value={stats.total.toString()}
                 icon={<FileText className="h-5 w-5 text-primary" />}
-                description="All documents"
+                description={typeFilter ? `${typeFilter} documents` : "All documents"}
                 trend={{ value: 12, isPositive: true }}
               />
               <StatCard
@@ -106,8 +134,10 @@ const Dashboard = () => {
 
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Recent Documents</h2>
-            <Link to="/documents">
+            <h2 className="text-xl font-semibold">
+              Recent Documents{typeFilter ? ` - ${typeFilter}` : ''}
+            </h2>
+            <Link to={`/documents${typeFilter ? `?type=${typeFilter}` : ''}`}>
               <Button variant="outline" size="sm" className="gap-1">
                 <span>View All</span>
                 <ArrowRight className="h-4 w-4" />

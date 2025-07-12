@@ -3,17 +3,26 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     DocumentViewSet, WorkflowViewSet, WorkflowStepViewSet, 
     ValidationRuleViewSet, NotificationViewSet,
+    IntegrationConfigurationViewSet, IntegrationAuditLogViewSet,
+    DocumentApprovalViewSet, WorkflowExecutionViewSet, RealTimeSyncStatusViewSet,
     download_document_data,  # Import the direct view function
     test_endpoint,  # Add test endpoint
     download_document_csv  # Add CSV download function
 )
 
-# Configure router with explicit trailing slash handling - without documents
+# Configure router with explicit trailing slash handling
 router = DefaultRouter(trailing_slash=True)
 router.register(r'workflows', WorkflowViewSet, basename='workflow')
 router.register(r'workflow-steps', WorkflowStepViewSet, basename='workflowstep')
 router.register(r'validation-rules', ValidationRuleViewSet, basename='validationrule')
 router.register(r'notifications', NotificationViewSet, basename='notification')
+
+# New endpoints for enhanced features
+router.register(r'integrations', IntegrationConfigurationViewSet, basename='integration')
+router.register(r'integration-logs', IntegrationAuditLogViewSet, basename='integration-log')
+router.register(r'approvals', DocumentApprovalViewSet, basename='approval')
+router.register(r'workflow-executions', WorkflowExecutionViewSet, basename='workflow-execution')
+router.register(r'sync-status', RealTimeSyncStatusViewSet, basename='sync-status')
 
 # Create document viewset actions manually
 document_list = DocumentViewSet.as_view({'get': 'list', 'post': 'create'})
@@ -32,6 +41,8 @@ document_validation_status = DocumentViewSet.as_view({'get': 'validation_status'
 document_trigger_workflow = DocumentViewSet.as_view({'post': 'trigger_workflow'})
 document_integrate = DocumentViewSet.as_view({'post': 'integrate_with_system'})
 document_integrations = DocumentViewSet.as_view({'get': 'available_integrations'})
+document_with_approvals = DocumentViewSet.as_view({'get': 'with_approvals'})
+document_start_sync = DocumentViewSet.as_view({'post': 'start_sync'})
 
 urlpatterns = [
     # IMPORTANT: Static endpoints must come BEFORE parameterized ones
@@ -65,6 +76,8 @@ urlpatterns = [
     path('documents/<str:pk>/validation_status/', document_validation_status, name='document-validation-status'),
     path('documents/<str:pk>/trigger_workflow/', document_trigger_workflow, name='document-trigger-workflow'),
     path('documents/<str:pk>/integrate_with_system/', document_integrate, name='document-integrate-with-system'),
+    path('documents/<str:pk>/with_approvals/', document_with_approvals, name='document-with-approvals'),
+    path('documents/<str:pk>/start_sync/', document_start_sync, name='document-start-sync'),
     
     # Include router URLs for other viewsets
     path('', include(router.urls)),

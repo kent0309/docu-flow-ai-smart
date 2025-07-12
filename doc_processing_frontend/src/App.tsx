@@ -10,6 +10,10 @@ import Documents from "./pages/Documents";
 import Upload from "./pages/Upload";
 import Workflows from "./pages/Workflows";
 import Analytics from "./pages/Analytics";
+import Settings from "./pages/Settings";
+import Help from "./pages/Help";
+import Integrations from "./pages/Integrations";
+import Approvals from "./pages/Approvals";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +31,10 @@ const App = () => (
           <Route path="/upload" element={<Upload />} />
           <Route path="/workflows" element={<Workflows />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/integrations" element={<Integrations />} />
+          <Route path="/approvals" element={<Approvals />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/help" element={<Help />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
