@@ -5,10 +5,42 @@ from nltk.sentiment import SentimentIntensityAnalyzer
 from nltk.tokenize import sent_tokenize
 import nltk
 import json
-from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
 import spacy
 import functools
 from concurrent.futures import ThreadPoolExecutor
+
+# Global variables for lazy loading
+_transformers_pipeline = None
+_transformers_AutoTokenizer = None
+_transformers_AutoModelForSeq2SeqLM = None
+_transformers_loaded = False
+
+def load_transformers():
+    """
+    Lazy loading of transformers components to avoid import issues.
+    """
+    global _transformers_pipeline, _transformers_AutoTokenizer, _transformers_AutoModelForSeq2SeqLM, _transformers_loaded
+    
+    if _transformers_loaded:
+        return _transformers_pipeline, _transformers_AutoTokenizer, _transformers_AutoModelForSeq2SeqLM
+    
+    try:
+        from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
+        _transformers_pipeline = pipeline
+        _transformers_AutoTokenizer = AutoTokenizer
+        _transformers_AutoModelForSeq2SeqLM = AutoModelForSeq2SeqLM
+        _transformers_loaded = True
+        print("Transformers loaded successfully")
+        return _transformers_pipeline, _transformers_AutoTokenizer, _transformers_AutoModelForSeq2SeqLM
+    except ImportError as e:
+        print(f"WARNING: Could not load transformers due to import error: {e}")
+        print("NLP features requiring transformers will be disabled.")
+        _transformers_loaded = True  # Mark as loaded to avoid repeated attempts
+        return None, None, None
+    except Exception as e:
+        print(f"WARNING: Unexpected error loading transformers: {e}")
+        _transformers_loaded = True
+        return None, None, None
 
 # Download necessary NLTK data packages if not already downloaded
 try:
@@ -56,16 +88,24 @@ async def summarize_document(file_path):
         if invoice_summary:
             return invoice_summary
         
+        # Load transformers components with lazy loading
+        pipeline_func, AutoTokenizer_class, AutoModelForSeq2SeqLM_class = load_transformers()
+        
+        if pipeline_func is None:
+            # Fallback to simpler method if transformers unavailable
+            sentences = sent_tokenize(extracted_text)
+            return " ".join(sentences[:3]) + "..."
+        
         # Load summarization pipeline with t5-small model
         # We use a context manager to properly handle any potential CUDA memory issues
-        summarizer = pipeline("summarization", model="t5-small")
+        summarizer = pipeline_func("summarization", model="t5-small")
         
         # T5 models are trained with a prefix
         text_to_summarize = "summarize: " + extracted_text
         
         # Handle long texts by chunking if necessary
         max_token_length = 512  # t5-small has a limit
-        tokenizer = AutoTokenizer.from_pretrained("t5-small")
+        tokenizer = AutoTokenizer_class.from_pretrained("t5-small")
         encoded_input = tokenizer(text_to_summarize, return_tensors="pt", truncation=True, max_length=max_token_length)
         
         # Generate summary

@@ -595,8 +595,10 @@ class AdvancedWorkflowService:
             logger.error(f"Failed to send email to {recipient_email}: {str(e)}")
             return False
 
+
 # Global service instance
 workflow_service = AdvancedWorkflowService()
+
 
 # Legacy compatibility functions
 async def start_document_workflow(document, workflow):
@@ -604,6 +606,7 @@ async def start_document_workflow(document, workflow):
     Start a document workflow
     """
     return await workflow_service.start_document_workflow(document, workflow)
+
 
 async def send_email_notification(notification):
     """
@@ -628,6 +631,7 @@ async def send_email_notification(notification):
         await notification.asave()
         
         return False
+
 
 async def process_document_in_workflow(document_id, workflow_id, started_by=None):
     """
@@ -655,6 +659,7 @@ async def process_document_in_workflow(document_id, workflow_id, started_by=None
             "status": "failed",
             "error": str(e)
         }
+
 
 async def get_workflow_templates():
     """
@@ -687,6 +692,7 @@ async def get_workflow_templates():
         })
         
     return workflows
+
 
 async def create_workflow(name, description, steps, requires_approval=False, approval_threshold=None):
     """
@@ -722,6 +728,7 @@ async def create_workflow(name, description, steps, requires_approval=False, app
         await workflow_step.asave()
         
     return workflow
+
 
 async def send_workflow_notification(recipient_email, subject, message, document_id=None, workflow_id=None):
     """

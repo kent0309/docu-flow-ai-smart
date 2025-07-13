@@ -10,12 +10,39 @@ import re
 from langdetect import detect, LangDetectException
 
 model_path = os.path.join(os.path.dirname(__file__), '..', '..', 'ml_models', 'document_classifier_pipeline.joblib')
-try:
-    classifier_pipeline = joblib.load(model_path)
-    print(f"Classification model loaded successfully from {model_path}")
-except FileNotFoundError:
-    print(f"WARNING: Classification model not found at {model_path}. Please run the training script.")
-    classifier_pipeline = None
+
+# Global variable to store the loaded model
+classifier_pipeline = None
+model_load_attempted = False
+
+def load_classification_model():
+    """
+    Lazy loading of the classification model to avoid import issues.
+    """
+    global classifier_pipeline, model_load_attempted
+    
+    if model_load_attempted:
+        return classifier_pipeline
+    
+    model_load_attempted = True
+    
+    try:
+        classifier_pipeline = joblib.load(model_path)
+        print(f"Classification model loaded successfully from {model_path}")
+        return classifier_pipeline
+    except FileNotFoundError:
+        print(f"WARNING: Classification model not found at {model_path}. Please run the training script.")
+        classifier_pipeline = None
+        return None
+    except ImportError as e:
+        print(f"WARNING: Could not load classification model due to import error: {e}")
+        print("Falling back to keyword-based classification only.")
+        classifier_pipeline = None
+        return None
+    except Exception as e:
+        print(f"WARNING: Unexpected error loading classification model: {e}")
+        classifier_pipeline = None
+        return None
 
 # Dictionary mapping language codes to full names
 LANGUAGE_MAPPING = {
@@ -98,13 +125,14 @@ def classify_document(text_content):
             return specialized
             
         # If no keywords matched and we have a trained model, use ML classification
-        if classifier_pipeline:
+        model = load_classification_model()
+        if model:
             # Basic classification
-            prediction = classifier_pipeline.predict([text_content])
+            prediction = model.predict([text_content])
             doc_type = prediction[0]
             
             # Get prediction probabilities to check confidence
-            proba = classifier_pipeline.predict_proba([text_content])[0]
+            proba = model.predict_proba([text_content])[0]
             max_proba = max(proba)
             
             # If confidence is low, return "unknown" or "other"
@@ -343,20 +371,3 @@ def get_language_confidence(text_content, target_languages=None):
             return {}
     except LangDetectException:
         return {}
-def classify_document(text_content):
-    if not classifier_pipeline or not text_content:
-        return "unknown"
-    try:
-        prediction = classifier_pipeline.predict([text_content])
-        return prediction[0]
-    except Exception as e:
-        print(f"Error during classification: {e}")
-        return "error"
-
-def detect_document_language(text_content):
-    try:
-        if text_content and len(text_content.strip()) > 20:
-            return detect(text_content)
-        return "unknown"
-    except LangDetectException:
-        return "unknown"

@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDistanceToNow } from 'date-fns';
 import { Download, Loader2, CheckCircle, Zap } from 'lucide-react';
-import { getDocument } from '@/lib/api';
+import { getDocument, sendToApproval } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { IntegrationSelectionDialog } from './IntegrationSelectionDialog';
 
@@ -28,6 +28,8 @@ interface DocumentDetailViewProps {
 const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({ document, isOpen, onClose }) => {
   const { toast } = useToast();
   const [showIntegrationDialog, setShowIntegrationDialog] = useState(false);
+  const [isApprovalLoading, setIsApprovalLoading] = useState(false);
+  const [isIntegrationLoading, setIsIntegrationLoading] = useState(false);
   
   // Fetch full document details when modal is opened
   const { data: fullDocument, isLoading, error } = useQuery({
@@ -70,28 +72,42 @@ const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({ document, isOpe
 
   // Send document to approval
   const handleSendToApproval = async () => {
+    if (isApprovalLoading) return; // Prevent multiple clicks
+    
+    // Validate document state
+    if (!document || !document.id) {
+      toast({
+        title: "Error",
+        description: "Invalid document selected. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (document.status !== 'processed') {
+      toast({
+        title: "Error",
+        description: "Document must be processed before sending to approval.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
+      setIsApprovalLoading(true);
       console.log('Sending document to approval:', document.id);
       
-      const response = await fetch(`/api/documents/${document.id}/send-to-approval/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          document_id: document.id,
-        }),
+      // Add loading state indicator
+      toast({
+        title: "Sending to Approval",
+        description: "Processing your request...",
       });
       
-      if (!response.ok) {
-        throw new Error('Failed to send document to approval');
-      }
-      
-      const result = await response.json();
+      const result = await sendToApproval(document.id);
       
       toast({
         title: "Document Sent to Approval",
-        description: `${document.filename} has been sent for approval.`,
+        description: `${document.filename} has been sent for approval successfully.`,
       });
       
       console.log('Document sent to approval successfully:', result);
@@ -100,21 +116,49 @@ const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({ document, isOpe
       console.error('Failed to send document to approval:', error);
       toast({
         title: "Error",
-        description: "Failed to send document to approval. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to send document to approval. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsApprovalLoading(false);
     }
   };
 
   // Open integration selection dialog
   const handleSendForIntegration = () => {
+    if (isIntegrationLoading) return; // Prevent multiple clicks
+    
+    // Validate document state
+    if (!document || !document.id) {
+      toast({
+        title: "Error",
+        description: "Invalid document selected. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (document.status !== 'processed') {
+      toast({
+        title: "Error",
+        description: "Document must be processed before sending for integration.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    console.log('Opening integration selection dialog for document:', document.id);
     setShowIntegrationDialog(true);
   };
 
   // Handle successful integration
   const handleIntegrationSuccess = () => {
+    // Reset loading state
+    setIsIntegrationLoading(false);
+    
     // You can add any additional logic here if needed
     // For example, refresh the document data or update the UI
+    console.log('Integration completed successfully');
   };
   
   // Format the uploaded date
@@ -436,14 +480,40 @@ const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({ document, isOpe
                 Download CSV
               </Button>
               
-              <Button onClick={handleSendToApproval} className="bg-blue-600 hover:bg-blue-700">
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Send to Approval
+              <Button 
+                onClick={handleSendToApproval} 
+                className="bg-blue-600 hover:bg-blue-700"
+                disabled={isApprovalLoading}
+              >
+                {isApprovalLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Send to Approval
+                  </>
+                )}
               </Button>
               
-              <Button onClick={handleSendForIntegration} className="bg-green-600 hover:bg-green-700">
-                <Zap className="h-4 w-4 mr-2" />
-                Send for Integration
+              <Button 
+                onClick={handleSendForIntegration} 
+                className="bg-green-600 hover:bg-green-700"
+                disabled={isIntegrationLoading}
+              >
+                {isIntegrationLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-4 w-4 mr-2" />
+                    Send for Integration
+                  </>
+                )}
               </Button>
             </div>
           </div>

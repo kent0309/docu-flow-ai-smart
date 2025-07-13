@@ -40,34 +40,6 @@ export interface IntegrationAuditLog {
   response_data?: any;
 }
 
-// Workflow interfaces
-export interface WorkflowStep {
-  id: string;
-  name: string;
-  description: string;
-  step_order: number;
-  workflow: string;
-}
-
-export interface Workflow {
-  id: string;
-  name: string;
-  description: string;
-  is_active: boolean;
-  created_at: string;
-  steps: WorkflowStep[];
-}
-
-export interface WorkflowTemplate {
-  name: string;
-  description: string;
-  steps: {
-    name: string;
-    description: string;
-    order: number;
-  }[];
-}
-
 // Fetch all documents from the Django API
 export const fetchDocuments = async (): Promise<Document[]> => {
   try {
@@ -241,7 +213,7 @@ export const fetchIntegrations = async (): Promise<IntegrationConfiguration[]> =
 // Send document for integration
 export const sendForIntegration = async (documentId: string, integrationId: string): Promise<IntegrationAuditLog> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/documents/${documentId}/send_for_integration/`, {
+    const response = await fetch(`${API_BASE_URL}/documents/${documentId}/send-for-integration/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -259,6 +231,31 @@ export const sendForIntegration = async (documentId: string, integrationId: stri
     return await response.json();
   } catch (error) {
     console.error(`Error sending document ${documentId} for integration:`, error);
+    throw error;
+  }
+};
+
+// Send document to approval
+export const sendToApproval = async (documentId: string): Promise<any> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/documents/${documentId}/send-to-approval/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        document_id: documentId,
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error(`Error sending document ${documentId} to approval:`, error);
     throw error;
   }
 };
@@ -316,147 +313,6 @@ export const fetchIntegrationLogs = async (): Promise<IntegrationAuditLog[]> => 
     return await response.json();
   } catch (error) {
     console.error('Error fetching integration logs:', error);
-    throw error;
-  }
-};
-
-// Process document through workflow
-export const processDocumentWorkflow = async (documentId: string, workflowId: string) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/documents/${documentId}/process_workflow/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ workflow_id: workflowId }),
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error(`Error processing document ${documentId} with workflow ${workflowId}:`, error);
-    throw error;
-  }
-};
-
-// Fetch all workflows
-export const fetchWorkflows = async (): Promise<Workflow[]> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/workflows/`);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching workflows:', error);
-    throw error;
-  }
-};
-
-// Get workflow details
-export const getWorkflow = async (id: string): Promise<Workflow> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/workflows/${id}/`);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error(`Error fetching workflow ${id}:`, error);
-    throw error;
-  }
-};
-
-// Create a new workflow
-export const createWorkflow = async (workflow: Partial<Workflow>): Promise<Workflow> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/workflows/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(workflow),
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Error creating workflow:', error);
-    throw error;
-  }
-};
-
-// Get workflow templates
-export const getWorkflowTemplates = async (): Promise<WorkflowTemplate[]> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/workflows/templates/`);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching workflow templates:', error);
-    throw error;
-  }
-};
-
-// Create workflow from template
-export const createWorkflowFromTemplate = async (templateName: string): Promise<Workflow> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/workflows/create_from_template/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ template_name: templateName }),
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error(`Error creating workflow from template "${templateName}":`, error);
-    throw error;
-  }
-};
-
-// Create workflow step
-export const createWorkflowStep = async (workflowStep: {
-  workflow: string;
-  name: string;
-  description: string;
-  step_order: number;
-}) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/workflow-steps/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(workflowStep),
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Error creating workflow step:', error);
     throw error;
   }
 }; 
