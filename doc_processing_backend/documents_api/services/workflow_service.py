@@ -25,7 +25,7 @@ class AdvancedWorkflowService:
     async def start_document_workflow(self, document, workflow, started_by=None):
         """
         Start a document workflow with advanced routing capabilities
-    
+        
         Args:
             document: The document to process
             workflow: The workflow to use
@@ -103,7 +103,7 @@ class AdvancedWorkflowService:
                 "workflow_id": str(workflow.id),
                 "workflow_name": workflow.name
             }
-        
+    
     async def _check_approval_required(self, document, workflow):
         """
         Check if document requires approval based on workflow criteria
@@ -436,6 +436,26 @@ class AdvancedWorkflowService:
             
             return {"status": "completed", "message": "Workflow completed successfully"}
     
+    async def continue_workflow(self, execution):
+        """
+        Continue workflow execution after approval or other pause
+        """
+        try:
+            print(f"🔄 Continuing workflow for execution {execution.id}")
+            
+            # Move to next step
+            result = await self._move_to_next_step(execution)
+            
+            print(f"✅ Workflow continuation result: {result}")
+            return result
+            
+        except Exception as e:
+            print(f"❌ Error continuing workflow: {str(e)}")
+            execution.status = 'failed'
+            execution.error_log = f"Error continuing workflow: {str(e)}"
+            await execution.asave()
+            return {"status": "failed", "error": str(e)}
+    
     async def handle_approval_response(self, approval_id, approver, action, comments=None):
         """
         Handle approval response (approve/reject/delegate)
@@ -575,8 +595,10 @@ class AdvancedWorkflowService:
             logger.error(f"Failed to send email to {recipient_email}: {str(e)}")
             return False
 
+
 # Global service instance
 workflow_service = AdvancedWorkflowService()
+
 
 # Legacy compatibility functions
 async def start_document_workflow(document, workflow):
@@ -584,6 +606,7 @@ async def start_document_workflow(document, workflow):
     Start a document workflow
     """
     return await workflow_service.start_document_workflow(document, workflow)
+
 
 async def send_email_notification(notification):
     """
@@ -608,6 +631,7 @@ async def send_email_notification(notification):
         await notification.asave()
         
         return False
+
 
 async def process_document_in_workflow(document_id, workflow_id, started_by=None):
     """
@@ -635,6 +659,7 @@ async def process_document_in_workflow(document_id, workflow_id, started_by=None
             "status": "failed",
             "error": str(e)
         }
+
 
 async def get_workflow_templates():
     """
@@ -667,6 +692,7 @@ async def get_workflow_templates():
         })
         
     return workflows
+
 
 async def create_workflow(name, description, steps, requires_approval=False, approval_threshold=None):
     """
@@ -702,6 +728,7 @@ async def create_workflow(name, description, steps, requires_approval=False, app
         await workflow_step.asave()
         
     return workflow
+
 
 async def send_workflow_notification(recipient_email, subject, message, document_id=None, workflow_id=None):
     """

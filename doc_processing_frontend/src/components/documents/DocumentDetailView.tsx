@@ -14,8 +14,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDistanceToNow } from 'date-fns';
-import { Download, Loader2 } from 'lucide-react';
+import { Download, Loader2, CheckCircle, Zap } from 'lucide-react';
 import { getDocument } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
+import { IntegrationSelectionDialog } from './IntegrationSelectionDialog';
 
 interface DocumentDetailViewProps {
   document: any; // Replace with proper type when available
@@ -24,6 +26,9 @@ interface DocumentDetailViewProps {
 }
 
 const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({ document, isOpen, onClose }) => {
+  const { toast } = useToast();
+  const [showIntegrationDialog, setShowIntegrationDialog] = useState(false);
+  
   // Fetch full document details when modal is opened
   const { data: fullDocument, isLoading, error } = useQuery({
     queryKey: ['document', document?.id],
@@ -61,6 +66,55 @@ const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({ document, isOpe
       console.error('Download failed:', error);
       alert('Download failed. Please try again.');
     }
+  };
+
+  // Send document to approval
+  const handleSendToApproval = async () => {
+    try {
+      console.log('Sending document to approval:', document.id);
+      
+      const response = await fetch(`/api/documents/${document.id}/send-to-approval/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          document_id: document.id,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to send document to approval');
+      }
+      
+      const result = await response.json();
+      
+      toast({
+        title: "Document Sent to Approval",
+        description: `${document.filename} has been sent for approval.`,
+      });
+      
+      console.log('Document sent to approval successfully:', result);
+      
+    } catch (error) {
+      console.error('Failed to send document to approval:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send document to approval. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Open integration selection dialog
+  const handleSendForIntegration = () => {
+    setShowIntegrationDialog(true);
+  };
+
+  // Handle successful integration
+  const handleIntegrationSuccess = () => {
+    // You can add any additional logic here if needed
+    // For example, refresh the document data or update the UI
   };
   
   // Format the uploaded date
@@ -373,13 +427,37 @@ const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({ document, isOpe
         </ScrollArea>
         
         <DialogFooter className="mt-6">
-          <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button onClick={handleDownload}>
-            <Download className="h-4 w-4 mr-2" />
-            Download CSV
-          </Button>
+          <div className="flex justify-between w-full">
+            <Button variant="outline" onClick={onClose}>Close</Button>
+            
+            <div className="flex gap-2">
+              <Button onClick={handleDownload} variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Download CSV
+              </Button>
+              
+              <Button onClick={handleSendToApproval} className="bg-blue-600 hover:bg-blue-700">
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Send to Approval
+              </Button>
+              
+              <Button onClick={handleSendForIntegration} className="bg-green-600 hover:bg-green-700">
+                <Zap className="h-4 w-4 mr-2" />
+                Send for Integration
+              </Button>
+            </div>
+          </div>
         </DialogFooter>
       </DialogContent>
+      
+      {/* Integration Selection Dialog */}
+      <IntegrationSelectionDialog
+        open={showIntegrationDialog}
+        onOpenChange={setShowIntegrationDialog}
+        documentId={document.id}
+        documentName={document.filename}
+        onSuccess={handleIntegrationSuccess}
+      />
     </Dialog>
   );
 };

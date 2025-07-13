@@ -67,16 +67,6 @@ const Upload = () => {
                       </select>
                     </div>
                     
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Workflow</label>
-                      <select className="w-full rounded-md border border-input bg-background px-3 py-2">
-                        <option value="default">Default Processing</option>
-                        <option value="invoice">Invoice Processing</option>
-                        <option value="contract">Contract Analysis</option>
-                        <option value="receipt">Receipt Processing</option>
-                      </select>
-                    </div>
-                    
                     <div className="flex items-center space-x-2">
                       <input 
                         type="checkbox" 

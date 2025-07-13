@@ -5,6 +5,7 @@ from .views import (
     ValidationRuleViewSet, NotificationViewSet,
     IntegrationConfigurationViewSet, IntegrationAuditLogViewSet,
     DocumentApprovalViewSet, WorkflowExecutionViewSet, RealTimeSyncStatusViewSet,
+    BusinessRulesViewSet,
     download_document_data,  # Import the direct view function
     test_endpoint,  # Add test endpoint
     download_document_csv  # Add CSV download function
@@ -23,6 +24,7 @@ router.register(r'integration-logs', IntegrationAuditLogViewSet, basename='integ
 router.register(r'approvals', DocumentApprovalViewSet, basename='approval')
 router.register(r'workflow-executions', WorkflowExecutionViewSet, basename='workflow-execution')
 router.register(r'sync-status', RealTimeSyncStatusViewSet, basename='sync-status')
+router.register(r'business-rules', BusinessRulesViewSet, basename='business-rules')
 
 # Create document viewset actions manually
 document_list = DocumentViewSet.as_view({'get': 'list', 'post': 'create'})
@@ -43,6 +45,8 @@ document_integrate = DocumentViewSet.as_view({'post': 'integrate_with_system'})
 document_integrations = DocumentViewSet.as_view({'get': 'available_integrations'})
 document_with_approvals = DocumentViewSet.as_view({'get': 'with_approvals'})
 document_start_sync = DocumentViewSet.as_view({'post': 'start_sync'})
+document_send_to_approval = DocumentViewSet.as_view({'post': 'send_to_approval'})
+document_send_for_integration = DocumentViewSet.as_view({'post': 'send_for_integration'})
 
 urlpatterns = [
     # IMPORTANT: Static endpoints must come BEFORE parameterized ones
@@ -78,6 +82,8 @@ urlpatterns = [
     path('documents/<str:pk>/integrate_with_system/', document_integrate, name='document-integrate-with-system'),
     path('documents/<str:pk>/with_approvals/', document_with_approvals, name='document-with-approvals'),
     path('documents/<str:pk>/start_sync/', document_start_sync, name='document-start-sync'),
+    path('documents/<str:pk>/send-to-approval/', document_send_to_approval, name='document-send-to-approval'),
+    path('documents/<str:pk>/send-for-integration/', document_send_for_integration, name='document-send-for-integration'),
     
     # Include router URLs for other viewsets
     path('', include(router.urls)),

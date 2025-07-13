@@ -38,9 +38,6 @@ const Navbar = () => {
           <Link to="/documents" className="text-sm font-medium hover:text-primary transition-colors">
             Documents
           </Link>
-          <Link to="/workflows" className="text-sm font-medium hover:text-primary transition-colors">
-            Workflows
-          </Link>
           <Link to="/analytics" className="text-sm font-medium hover:text-primary transition-colors">
             Analytics
           </Link>

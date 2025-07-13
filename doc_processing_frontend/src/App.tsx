@@ -8,7 +8,6 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Documents from "./pages/Documents";
 import Upload from "./pages/Upload";
-import Workflows from "./pages/Workflows";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import Help from "./pages/Help";
@@ -29,7 +28,6 @@ const App = () => (
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/documents" element={<Documents />} />
           <Route path="/upload" element={<Upload />} />
-          <Route path="/workflows" element={<Workflows />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/integrations" element={<Integrations />} />
           <Route path="/approvals" element={<Approvals />} />

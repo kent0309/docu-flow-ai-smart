@@ -4,7 +4,6 @@ import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   FileText, 
-  Workflow, 
   BarChart3, 
   Settings, 
   HelpCircle,
@@ -95,11 +94,6 @@ const Sidebar = ({ className, statusCounts }: SidebarProps) => {
             <Link to="/upload" className={getNavLinkClasses('/upload')}>
               <Upload className="h-4 w-4" />
               <span>Upload</span>
-            </Link>
-            
-            <Link to="/workflows" className={getNavLinkClasses('/workflows')}>
-              <Workflow className="h-4 w-4" />
-              <span>Workflows</span>
             </Link>
             
             <Link to="/approvals" className={getNavLinkClasses('/approvals')}>

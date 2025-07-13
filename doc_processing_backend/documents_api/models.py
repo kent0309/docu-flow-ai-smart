@@ -236,7 +236,7 @@ class DocumentApproval(models.Model):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='approvals')
-    workflow_step = models.ForeignKey(WorkflowStep, on_delete=models.CASCADE, related_name='approvals')
+    workflow_step = models.ForeignKey(WorkflowStep, on_delete=models.CASCADE, related_name='approvals', null=True, blank=True)
     
     # Approval details
     approver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='document_approvals')

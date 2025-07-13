@@ -13,10 +13,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
+import { EditIntegrationModal } from '@/components/documents/EditIntegrationModal';
 import {
   PlusCircle, 
   Settings, 
-  Play, 
   Pause, 
   Trash2, 
   CheckCircle, 
@@ -68,13 +68,7 @@ const createIntegration = async (data: any) => {
   return response.json();
 };
 
-const testIntegrationConnection = async (integrationId: string) => {
-  const response = await fetch(`/api/integrations/${integrationId}/test_connection/`, {
-    method: 'POST',
-  });
-  if (!response.ok) throw new Error('Failed to test connection');
-  return response.json();
-};
+
 
 const updateIntegration = async ({ id, data }: { id: string; data: any }) => {
   const response = await fetch(`/api/integrations/${id}/`, {
@@ -192,23 +186,7 @@ const Integrations = () => {
     },
   });
 
-  const testConnectionMutation = useMutation({
-    mutationFn: testIntegrationConnection,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['integrations'] });
-      toast({
-        title: 'Success',
-        description: 'Connection test started.',
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to test connection.',
-        variant: 'destructive',
-      });
-    },
-  });
+
 
   const resetForm = () => {
     setNewIntegration({
@@ -235,15 +213,23 @@ const Integrations = () => {
     setIsEditModalOpen(true);
   };
 
+  const handleEditSuccess = (updatedIntegration: any) => {
+    queryClient.invalidateQueries({ queryKey: ['integrations'] });
+    setIsEditModalOpen(false);
+    setSelectedIntegration(null);
+    toast({
+      title: 'Integration Updated',
+      description: `${updatedIntegration.name} has been updated successfully.`,
+    });
+  };
+
   const handleDelete = (integration: any) => {
     if (confirm('Are you sure you want to delete this integration?')) {
       deleteMutation.mutate(integration.id);
     }
   };
 
-  const handleTestConnection = (integration: any) => {
-    testConnectionMutation.mutate(integration.id);
-  };
+
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -445,15 +431,6 @@ const Integrations = () => {
                       )}
                       
                       <div className="flex items-center gap-2 pt-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleTestConnection(integration)}
-                          disabled={testConnectionMutation.isPending}
-                        >
-                          <Play className="h-3 w-3 mr-1" />
-                          Test
-                        </Button>
                         <Button
                           size="sm"
                           variant="outline"
@@ -665,6 +642,14 @@ const Integrations = () => {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Edit Integration Modal */}
+        <EditIntegrationModal
+          open={isEditModalOpen}
+          onOpenChange={setIsEditModalOpen}
+          integration={selectedIntegration}
+          onSuccess={handleEditSuccess}
+        />
       </div>
     </MainLayout>
   );
