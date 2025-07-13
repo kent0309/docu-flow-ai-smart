@@ -17,6 +17,7 @@ import { EditIntegrationModal } from '@/components/documents/EditIntegrationModa
 import {
   PlusCircle, 
   Settings, 
+  Play, 
   Pause, 
   Trash2, 
   CheckCircle, 
@@ -68,7 +69,13 @@ const createIntegration = async (data: any) => {
   return response.json();
 };
 
-
+const testIntegrationConnection = async (integrationId: string) => {
+  const response = await fetch(`/api/integrations/${integrationId}/test_connection/`, {
+    method: 'POST',
+  });
+  if (!response.ok) throw new Error('Failed to test connection');
+  return response.json();
+};
 
 const updateIntegration = async ({ id, data }: { id: string; data: any }) => {
   const response = await fetch(`/api/integrations/${id}/`, {
@@ -186,7 +193,23 @@ const Integrations = () => {
     },
   });
 
-
+  const testConnectionMutation = useMutation({
+    mutationFn: testIntegrationConnection,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['integrations'] });
+      toast({
+        title: 'Success',
+        description: 'Connection test started.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to test connection.',
+        variant: 'destructive',
+      });
+    },
+  });
 
   const resetForm = () => {
     setNewIntegration({
@@ -229,7 +252,9 @@ const Integrations = () => {
     }
   };
 
-
+  const handleTestConnection = (integration: any) => {
+    testConnectionMutation.mutate(integration.id);
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -431,6 +456,15 @@ const Integrations = () => {
                       )}
                       
                       <div className="flex items-center gap-2 pt-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleTestConnection(integration)}
+                          disabled={testConnectionMutation.isPending}
+                        >
+                          <Play className="h-3 w-3 mr-1" />
+                          Test
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"

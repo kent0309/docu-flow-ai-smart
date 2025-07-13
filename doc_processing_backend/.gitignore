@@ -1,9 +1,6 @@
-<<<<<<< HEAD
 # Environment Variables
 .env
 
-=======
->>>>>>> e04698c8799b2b7ddf72bfb7c83b9871efac3ea2
 # Python Virtual Environment
 /venv/
 

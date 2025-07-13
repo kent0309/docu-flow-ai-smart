@@ -13,7 +13,8 @@ import {
   AlertCircle,
   Filter,
   Zap,
-  Users
+  Users,
+  Workflow
 } from 'lucide-react';
 import {
   Select,
@@ -94,6 +95,11 @@ const Sidebar = ({ className, statusCounts }: SidebarProps) => {
             <Link to="/upload" className={getNavLinkClasses('/upload')}>
               <Upload className="h-4 w-4" />
               <span>Upload</span>
+            </Link>
+            
+            <Link to="/workflows" className={getNavLinkClasses('/workflows')}>
+              <Workflow className="h-4 w-4" />
+              <span>Workflows</span>
             </Link>
             
             <Link to="/approvals" className={getNavLinkClasses('/approvals')}>
