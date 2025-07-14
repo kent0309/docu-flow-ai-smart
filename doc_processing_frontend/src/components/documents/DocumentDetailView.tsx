@@ -324,13 +324,13 @@ const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({ document, isOpe
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[200px] rounded-md border p-4 bg-muted/30">
+              <div className="rounded-md border p-4 bg-muted/30">
                 <pre className="whitespace-pre-wrap text-sm">
                   {typeof extractedData.raw_text === 'string' 
                     ? extractedData.raw_text 
                     : extractedData.raw_text.value || JSON.stringify(extractedData.raw_text, null, 2)}
                 </pre>
-              </ScrollArea>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -378,11 +378,11 @@ const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({ document, isOpe
           </summary>
           <Card className="mt-2">
             <CardContent className="pt-4">
-              <ScrollArea className="h-[200px] rounded-md border p-4 bg-muted/30">
+              <div className="rounded-md border p-4 bg-muted/30">
                 <pre className="whitespace-pre-wrap text-sm">
                   {JSON.stringify(extractedData, null, 2)}
                 </pre>
-              </ScrollArea>
+              </div>
             </CardContent>
           </Card>
         </details>
@@ -392,8 +392,8 @@ const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({ document, isOpe
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-3">
             <span className="text-xl">{documentData.filename}</span>
             <Badge className={`${getStatusColor(documentData.status)} text-white`}>
@@ -405,72 +405,84 @@ const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({ document, isOpe
           </DialogDescription>
         </DialogHeader>
         
-        <ScrollArea className="flex-1 mt-4">
-          <Tabs defaultValue="data">
-            <TabsList className="mb-4">
+        <div className="flex-1 min-h-0 mt-4">
+          <Tabs defaultValue="data" className="h-full flex flex-col">
+            <TabsList className="mb-4 shrink-0">
               <TabsTrigger value="data">Extracted Data</TabsTrigger>
               <TabsTrigger value="summary">Summary</TabsTrigger>
               <TabsTrigger value="metadata">Metadata</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="data" className="space-y-4">
-              {renderExtractedData()}
+            <TabsContent value="data" className="flex-1 min-h-0 data-[state=active]:flex data-[state=active]:flex-col">
+              <div className="flex-1 min-h-0 overflow-y-auto pr-4" style={{ maxHeight: 'calc(90vh - 200px)' }}>
+                <div className="space-y-4">
+                  {renderExtractedData()}
+                </div>
+              </div>
             </TabsContent>
             
-            <TabsContent value="summary">
-              {documentData.summary ? (
-                <Card>
-                  <CardContent className="pt-4">
-                    <p>{documentData.summary}</p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <p className="text-muted-foreground">No summary available for this document.</p>
-              )}
+            <TabsContent value="summary" className="flex-1 min-h-0 data-[state=active]:flex data-[state=active]:flex-col">
+              <div className="flex-1 min-h-0 overflow-y-auto pr-4" style={{ maxHeight: 'calc(90vh - 200px)' }}>
+                <div className="space-y-4">
+                  {documentData.summary ? (
+                    <Card>
+                      <CardContent className="pt-4">
+                        <p>{documentData.summary}</p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <p className="text-muted-foreground">No summary available for this document.</p>
+                  )}
+                </div>
+              </div>
             </TabsContent>
             
-            <TabsContent value="metadata">
-              <Card>
-                <CardContent className="pt-4">
-                  <div className="grid gap-2">
-                    <div className="grid grid-cols-3 gap-1">
-                      <span className="font-medium">ID:</span>
-                      <span className="col-span-2 break-all">{documentData.id}</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-1">
-                      <span className="font-medium">File Name:</span>
-                      <span className="col-span-2">{documentData.filename}</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-1">
-                      <span className="font-medium">Status:</span>
-                      <span className="col-span-2">{documentData.status}</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-1">
-                      <span className="font-medium">Document Type:</span>
-                      <span className="col-span-2">{documentData.document_type || 'Unknown'}</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-1">
-                      <span className="font-medium">Language:</span>
-                      <span className="col-span-2">{documentData.detected_language || 'Unknown'}</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-1">
-                      <span className="font-medium">Uploaded:</span>
-                      <span className="col-span-2">{documentData.uploaded_at ? new Date(documentData.uploaded_at).toLocaleString() : 'Unknown'}</span>
-                    </div>
-                    {documentData.extracted_data?.confidence_score !== undefined && (
-                      <div className="grid grid-cols-3 gap-1">
-                        <span className="font-medium">Confidence Score:</span>
-                        <span className="col-span-2">{documentData.extracted_data.confidence_score * 100}%</span>
+            <TabsContent value="metadata" className="flex-1 min-h-0 data-[state=active]:flex data-[state=active]:flex-col">
+              <div className="flex-1 min-h-0 overflow-y-auto pr-4" style={{ maxHeight: 'calc(90vh - 200px)' }}>
+                <div className="space-y-4">
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="grid gap-2">
+                        <div className="grid grid-cols-3 gap-1">
+                          <span className="font-medium">ID:</span>
+                          <span className="col-span-2 break-all">{documentData.id}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1">
+                          <span className="font-medium">File Name:</span>
+                          <span className="col-span-2">{documentData.filename}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1">
+                          <span className="font-medium">Status:</span>
+                          <span className="col-span-2">{documentData.status}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1">
+                          <span className="font-medium">Document Type:</span>
+                          <span className="col-span-2">{documentData.document_type || 'Unknown'}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1">
+                          <span className="font-medium">Language:</span>
+                          <span className="col-span-2">{documentData.detected_language || 'Unknown'}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1">
+                          <span className="font-medium">Uploaded:</span>
+                          <span className="col-span-2">{documentData.uploaded_at ? new Date(documentData.uploaded_at).toLocaleString() : 'Unknown'}</span>
+                        </div>
+                        {documentData.extracted_data?.confidence_score !== undefined && (
+                          <div className="grid grid-cols-3 gap-1">
+                            <span className="font-medium">Confidence Score:</span>
+                            <span className="col-span-2">{documentData.extracted_data.confidence_score * 100}%</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
-        </ScrollArea>
+        </div>
         
-        <DialogFooter className="mt-6">
+        <DialogFooter className="mt-6 shrink-0">
           <div className="flex justify-between w-full">
             <Button variant="outline" onClick={onClose}>Close</Button>
             
