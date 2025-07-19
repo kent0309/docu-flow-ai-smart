@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { fetchDocuments, type Document } from '@/lib/api';
+import DocumentPollingManager from '@/components/documents/DocumentPollingManager';
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -63,8 +64,20 @@ const Dashboard = () => {
     return typeFilter ? ` - ${typeFilter}` : '';
   };
 
+  // Prepare documents for polling (only processing ones)
+  const processingDocuments = documents
+    .filter(doc => doc.status === 'processing')
+    .map(doc => ({
+      id: doc.id,
+      name: doc.filename,
+      status: doc.status
+    }));
+
   return (
     <MainLayout>
+      {/* Document Polling Manager for real-time status updates */}
+      <DocumentPollingManager documents={processingDocuments} />
+      
       <div className="space-y-8">
         <div className="flex justify-between items-center">
           <div>

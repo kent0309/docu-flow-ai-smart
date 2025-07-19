@@ -393,7 +393,7 @@ const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({ document, isOpe
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col">
-        <DialogHeader className="shrink-0">
+        <DialogHeader className="shrink-0 pb-4">
           <DialogTitle className="flex items-center gap-3">
             <span className="text-xl">{documentData.filename}</span>
             <Badge className={`${getStatusColor(documentData.status)} text-white`}>
@@ -405,7 +405,7 @@ const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({ document, isOpe
           </DialogDescription>
         </DialogHeader>
         
-        <div className="flex-1 min-h-0 mt-4">
+        <div className="flex-1 min-h-0">
           <Tabs defaultValue="data" className="h-full flex flex-col">
             <TabsList className="mb-4 shrink-0">
               <TabsTrigger value="data">Extracted Data</TabsTrigger>
@@ -413,70 +413,64 @@ const DocumentDetailView: React.FC<DocumentDetailViewProps> = ({ document, isOpe
               <TabsTrigger value="metadata">Metadata</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="data" className="flex-1 min-h-0 data-[state=active]:flex data-[state=active]:flex-col">
-              <div className="flex-1 min-h-0 overflow-y-auto pr-4" style={{ maxHeight: 'calc(90vh - 200px)' }}>
-                <div className="space-y-4">
-                  {renderExtractedData()}
-                </div>
+            <TabsContent value="data" className="flex-1 min-h-0 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 250px)' }}>
+              <div className="space-y-4 pr-4">
+                {renderExtractedData()}
               </div>
             </TabsContent>
             
-            <TabsContent value="summary" className="flex-1 min-h-0 data-[state=active]:flex data-[state=active]:flex-col">
-              <div className="flex-1 min-h-0 overflow-y-auto pr-4" style={{ maxHeight: 'calc(90vh - 200px)' }}>
-                <div className="space-y-4">
-                  {documentData.summary ? (
-                    <Card>
-                      <CardContent className="pt-4">
-                        <p>{documentData.summary}</p>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <p className="text-muted-foreground">No summary available for this document.</p>
-                  )}
-                </div>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="metadata" className="flex-1 min-h-0 data-[state=active]:flex data-[state=active]:flex-col">
-              <div className="flex-1 min-h-0 overflow-y-auto pr-4" style={{ maxHeight: 'calc(90vh - 200px)' }}>
-                <div className="space-y-4">
+            <TabsContent value="summary" className="flex-1 min-h-0 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 250px)' }}>
+              <div className="space-y-4 pr-4">
+                {documentData.summary ? (
                   <Card>
                     <CardContent className="pt-4">
-                      <div className="grid gap-2">
-                        <div className="grid grid-cols-3 gap-1">
-                          <span className="font-medium">ID:</span>
-                          <span className="col-span-2 break-all">{documentData.id}</span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-1">
-                          <span className="font-medium">File Name:</span>
-                          <span className="col-span-2">{documentData.filename}</span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-1">
-                          <span className="font-medium">Status:</span>
-                          <span className="col-span-2">{documentData.status}</span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-1">
-                          <span className="font-medium">Document Type:</span>
-                          <span className="col-span-2">{documentData.document_type || 'Unknown'}</span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-1">
-                          <span className="font-medium">Language:</span>
-                          <span className="col-span-2">{documentData.detected_language || 'Unknown'}</span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-1">
-                          <span className="font-medium">Uploaded:</span>
-                          <span className="col-span-2">{documentData.uploaded_at ? new Date(documentData.uploaded_at).toLocaleString() : 'Unknown'}</span>
-                        </div>
-                        {documentData.extracted_data?.confidence_score !== undefined && (
-                          <div className="grid grid-cols-3 gap-1">
-                            <span className="font-medium">Confidence Score:</span>
-                            <span className="col-span-2">{documentData.extracted_data.confidence_score * 100}%</span>
-                          </div>
-                        )}
-                      </div>
+                      <p>{documentData.summary}</p>
                     </CardContent>
                   </Card>
-                </div>
+                ) : (
+                  <p className="text-muted-foreground">No summary available for this document.</p>
+                )}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="metadata" className="flex-1 min-h-0 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 250px)' }}>
+              <div className="space-y-4 pr-4">
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="grid gap-2">
+                      <div className="grid grid-cols-3 gap-1">
+                        <span className="font-medium">ID:</span>
+                        <span className="col-span-2 break-all">{documentData.id}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1">
+                        <span className="font-medium">File Name:</span>
+                        <span className="col-span-2">{documentData.filename}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1">
+                        <span className="font-medium">Status:</span>
+                        <span className="col-span-2">{documentData.status}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1">
+                        <span className="font-medium">Document Type:</span>
+                        <span className="col-span-2">{documentData.document_type || 'Unknown'}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1">
+                        <span className="font-medium">Language:</span>
+                        <span className="col-span-2">{documentData.detected_language || 'Unknown'}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1">
+                        <span className="font-medium">Uploaded:</span>
+                        <span className="col-span-2">{documentData.uploaded_at ? new Date(documentData.uploaded_at).toLocaleString() : 'Unknown'}</span>
+                      </div>
+                      {documentData.extracted_data?.confidence_score !== undefined && (
+                        <div className="grid grid-cols-3 gap-1">
+                          <span className="font-medium">Confidence Score:</span>
+                          <span className="col-span-2">{documentData.extracted_data.confidence_score * 100}%</span>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </TabsContent>
           </Tabs>

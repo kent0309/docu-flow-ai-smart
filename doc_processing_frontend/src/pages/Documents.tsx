@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { fetchDocuments } from '@/lib/api';
+import DocumentPollingManager from '@/components/documents/DocumentPollingManager';
 
 const Documents = () => {
   const [searchParams] = useSearchParams();
@@ -40,6 +41,15 @@ const Documents = () => {
     setSelectedDocument(document);
     setIsDetailViewOpen(true);
   };
+
+  // Prepare documents for polling (only processing ones)
+  const processingDocuments = data
+    .filter(doc => doc.status === 'processing')
+    .map(doc => ({
+      id: doc.id,
+      name: doc.filename,
+      status: doc.status
+    }));
 
   // Handle loading state
   if (isLoading) {
@@ -160,6 +170,9 @@ const Documents = () => {
 
   return (
     <MainLayout>
+      {/* Document Polling Manager for real-time status updates */}
+      <DocumentPollingManager documents={processingDocuments} />
+      
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>

@@ -5,10 +5,23 @@ import { Progress } from '@/components/ui/progress';
 import { Upload, X, FileType } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import DocumentPollingManager from './DocumentPollingManager';
 
 const FileUploader = () => {
   const [files, setFiles] = useState<Array<File & { preview?: string }>>([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadedDocuments, setUploadedDocuments] = useState<Array<{ id: string; name: string; status: string }>>([]);
+
+  // Clean up completed documents from polling list
+  const cleanupCompletedDocuments = () => {
+    setUploadedDocuments(prev => prev.filter(doc => doc.status === 'processing'));
+  };
+
+  // Clean up every 30 seconds
+  React.useEffect(() => {
+    const interval = setInterval(cleanupCompletedDocuments, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setFiles(prevFiles => [...prevFiles, ...acceptedFiles.map(file => Object.assign(file, {
@@ -58,8 +71,18 @@ const FileUploader = () => {
       const responses = await Promise.all(uploadPromises);
       
       let allSuccess = true;
-      for (const res of responses) {
-        if (!res.ok) {
+      const newUploadedDocuments: Array<{ id: string; name: string; status: string }> = [];
+      
+      for (let i = 0; i < responses.length; i++) {
+        const res = responses[i];
+        if (res.ok) {
+          const documentData = await res.json();
+          newUploadedDocuments.push({
+            id: documentData.id,
+            name: files[i].name,
+            status: documentData.status
+          });
+        } else {
           allSuccess = false;
           console.error('An upload failed:', await res.json());
         }
@@ -67,6 +90,8 @@ const FileUploader = () => {
 
       if (allSuccess) {
         toast.success(`${files.length} file(s) uploaded successfully!`);
+        // Add uploaded documents to state for polling
+        setUploadedDocuments(prev => [...prev, ...newUploadedDocuments]);
       } else {
         toast.error('Some files failed to upload. See console for details.');
       }
@@ -88,8 +113,13 @@ const FileUploader = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+
+
   return (
     <div className="w-full space-y-6">
+      {/* Document Polling Manager for real-time status updates */}
+      <DocumentPollingManager documents={uploadedDocuments} />
+      
       <div 
         {...getRootProps()} 
         className={cn(

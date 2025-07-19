@@ -121,9 +121,13 @@ export const IntegrationSelectionDialog: React.FC<IntegrationSelectionDialogProp
       setSending(true);
       const result = await sendForIntegration(documentId, selectedIntegration);
       
+      // Find the selected integration details for the success message
+      const selectedIntegrationDetails = integrations.find(integration => integration.id === selectedIntegration);
+      const systemName = selectedIntegrationDetails?.name || 'external system';
+      
       toast({
-        title: "Document Sent for Integration",
-        description: `${documentName} has been sent for integration processing`,
+        title: "Integration Sent Successfully",
+        description: `Successfully sent ${documentName} to ${systemName}`,
       });
       
       onSuccess();
