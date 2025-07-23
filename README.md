@@ -33,7 +33,7 @@ This project is built with a modern, serverless-first technology stack:
 -   **ORM**: [Prisma](https://www.prisma.io/)
 -   **Vector Database**: [Pinecone](https://www.pinecone.io/)
 -   **AI Orchestration**: [LangChain](https://js.langchain.com/)
--   **AI Model**: [Google Gemini](https://ai.google.dev/)
+
 
 ## 🏗️ System Architecture
 
