@@ -1,4 +1,4 @@
-# Intelligent Document Processor
+# DocuFlow AI
 
 A full-stack application for AI-powered document processing and workflow automation.
 
